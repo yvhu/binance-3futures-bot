@@ -33,7 +33,7 @@ async function sendMainMenu() {
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
-    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
+    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }]
   ];
 
   try {
@@ -85,7 +85,10 @@ async function handleCommand(data, chatId) {
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
     sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
-    await sendMainMenu();    // ⬅️ 关键：刷新按钮面板
+    // 注意这里不再自动刷新按钮面板，改为单独按钮控制
+  } else if (data === 'refresh_signal') {
+    await sendMainMenu(); // 单独刷新多空信号按钮面板
+    sendTelegramMessage('🔄 已刷新多空数据按钮面板');
   } else if (data.startsWith('long_') || data.startsWith('short_')) {
     const symbol = data.split('_')[1];
     const isLong = data.startsWith('long_');
@@ -100,7 +103,6 @@ async function handleCommand(data, chatId) {
       } else {
         sendTelegramMessage('⚠️ 当前策略已暂停，仅缓存选币，不会下单');
       }
-
     } catch (err) {
       // 报错已经在 placeOrder 内部处理，这里可以再打印日志
       console.error(`下单失败: ${symbol}`, err.message);
