@@ -3,7 +3,6 @@ const config = require('../config/config');
 const { sendTelegramMessage } = require('../telegram/bot');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
-const { getCurrentPrice } = require('./price');      // 获取现价
 const { calcOrderQty } = require('./risk');          // 按仓位大小计算下单量
 const { getSymbolPrecision } = require('../utils/cache');
 
