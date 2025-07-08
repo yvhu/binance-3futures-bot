@@ -85,7 +85,8 @@ async function handleCommand(data, chatId) {
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
     sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
-    // 注意这里不再自动刷新按钮面板，改为单独按钮控制
+    // 注意这里保留刷新按钮面板，因为如果T50数据都变了，那面板数据理应跟着改变
+    await sendMainMenu(); 
   } else if (data === 'refresh_signal') {
     await sendMainMenu(); // 单独刷新多空信号按钮面板
     sendTelegramMessage('🔄 已刷新多空数据按钮面板');
