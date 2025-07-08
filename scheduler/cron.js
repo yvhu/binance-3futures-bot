@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const { runStrategyCycle } = require('../strategy/runner');
 const { log } = require('../utils/logger');
-const { serviceStatus } = require('../telegram/commands');
+const { serviceStatus } = require('../telegram/bot');
 
 async function startScheduler() {
   cron.schedule('*/3 * * * *', async () => {
