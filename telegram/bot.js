@@ -31,7 +31,7 @@ async function initTelegramBot() {
 async function sendMainMenu() {
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
-    [{ text: '🔁 立即执行', callback_data: 'run_now' }],
+    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
   ];
 
