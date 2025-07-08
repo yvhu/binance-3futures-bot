@@ -2,6 +2,7 @@
 const { EMA, BollingerBands } = require('technicalindicators');
 const axios = require('axios');
 const config = require('../config/config');
+const { log } = require('../utils/logger');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -39,6 +40,7 @@ function countRedCandles(klines, n) {
  */
 async function analyzeSymbol(symbol, interval) {
   // ====== 计算所需K线数量：确保足够覆盖所有指标的周期需求 ======
+  log(`🔍 分析币种: ${symbol}, 周期: ${interval}`);
   const limit = Math.max(
     config.ema.longPeriod + 5,
     config.bb.period + 5,
@@ -48,7 +50,10 @@ async function analyzeSymbol(symbol, interval) {
 
   // 获取历史K线数据
   const klines = await fetchKlines(symbol, interval, limit);
-  if (klines.length < limit) return { shouldLong: false, shouldShort: false, score: -999 };
+  if (klines.length < limit) {
+    log(`⚠️ 获取K线不足 ${limit} 条，实际只有 ${klines.length}，跳过分析`);
+    return { shouldLong: false, shouldShort: false, score: -999 };
+  }
 
   // 只提取收盘价数组用于技术指标计算
   const closes = klines.map(k => k.close);
@@ -66,7 +71,6 @@ async function analyzeSymbol(symbol, interval) {
 
   // 金叉/死叉后 N 根K线内视为有效信号（默认3根）
   const recentCandles = config.signalValidCandles || 3;
-
   let shouldLong = false;
   let shouldShort = false;
 
@@ -74,6 +78,8 @@ async function analyzeSymbol(symbol, interval) {
   let crossIndex = -1;
   let isCrossUp = false;
   let isCrossDown = false;
+
+  log(`📊 开始查找金叉/死叉，回溯 ${recentCandles} 根K线`);
 
   for (let i = emaLong.length - recentCandles - 1; i >= 1; i--) {
     const prevShort = emaShort[i - 1];
@@ -85,6 +91,7 @@ async function analyzeSymbol(symbol, interval) {
       // 发生金叉
       crossIndex = i;
       isCrossUp = true;
+      log(`🟢 检测到金叉: index=${i}, EMA7=${currShort.toFixed(6)}, EMA21=${currLong.toFixed(6)}`);
       break;
     }
 
@@ -92,6 +99,7 @@ async function analyzeSymbol(symbol, interval) {
       // 发生死叉
       crossIndex = i;
       isCrossDown = true;
+      log(`🔴 检测到死叉: index=${i}, EMA7=${currShort.toFixed(6)}, EMA21=${currLong.toFixed(6)}`);
       break;
     }
   }
@@ -101,31 +109,38 @@ async function analyzeSymbol(symbol, interval) {
     // 找到金叉/死叉发生时的价格和布林中轴
     const crossClose = closes[closes.length - emaLong.length + crossIndex];
     const crossBB = bb[bb.length - emaLong.length + crossIndex];
-    const basis = crossBB.middle;  // 中轴线（布林中轨）
-
+    const basis = crossBB.middle;
     const currentIndex = emaLong.length - 1;
 
     // 判断当前K线是否仍处于金叉/死叉后的有效期（N根K线内）
     const withinRecentCandles = (currentIndex - crossIndex) <= recentCandles;
 
     // 满足：金叉 + 当时K线在中轴上方 + 当前仍在有效范围内
+    log(`🔎 金叉/死叉中轴判断: Close=${crossClose}, Basis=${basis}, Valid=${withinRecentCandles}`);
     if (isCrossUp && crossClose >= basis && withinRecentCandles) {
       shouldLong = true;
+      log(`✅ 满足做多条件：金叉 + 上穿中轴 + 在${recentCandles}根K线内`);
     }
 
     // 满足：死叉 + 当时K线在中轴下方 + 当前仍在有效范围内
     if (isCrossDown && crossClose <= basis && withinRecentCandles) {
       shouldShort = true;
+      log(`✅ 满足做空条件：死叉 + 下穿中轴 + 在${recentCandles}根K线内`);
     }
+  } else {
+    log(`⚠️ 未检测到金叉/死叉`);
   }
 
   // ====== 连续阴线过滤（防止逆势追单）======
   const redCandleHit = countRedCandles(klines, config.maxRedCandles);
+  if (redCandleHit) {
+    log(`⚠️ 连续出现 ${config.maxRedCandles}+ 阴线，抑制信号`);
+  }
 
   // ====== 综合评分（可拓展机制）======
   let score = 0;
-  if (shouldLong || shouldShort) score += 1;       // 出现有效方向信号加分
-  if (redCandleHit) score -= 1;                    // 若处于连续阴线状态则减分（弱势）
+  if (shouldLong || shouldShort) score += 1;
+  if (redCandleHit) score -= 1;
 
   // 返回综合判断结果
   return { shouldLong, shouldShort, score };
