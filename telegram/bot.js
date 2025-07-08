@@ -58,7 +58,7 @@ async function sendMainMenu() {
 
 // 封装发送信息函数
 function sendTelegramMessage(text) {
-  if (bot && config.telegram.chatId) {
+  if (bot && config.telegram.chatId && text) {
     return bot.sendMessage(config.telegram.chatId, text);
   }
 }

@@ -4,6 +4,7 @@ const { sendTelegramMessage } = require('../telegram/bot');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
+const { analyzeSymbol } = require('../indicators/analyzer');
 
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
@@ -117,52 +118,104 @@ async function placeOrder(symbol, side = 'BUY') {
 /**
  * 检查是否需要超时平仓，如果超过 maxPositionMinutes 则自动平掉
  */
+/**
+ * 根据持仓情况判断是否需要平仓
+ * 条件：
+ *  1. 持仓时间超过配置的最大持仓时间
+ *  2. 当前技术信号与持仓方向相反，出现反转信号时提前平仓
+ *
+ * @param {string} symbol 币种交易对，比如 'BTCUSDT'
+ */
 async function closePositionIfNeeded(symbol) {
+  // 从本地持仓记录中获取该币种的持仓信息
   const position = POSITION_DB[symbol];
   if (!position) {
     log(`⚠️ ${symbol} 无持仓记录，无需平仓`);
     return;
   }
+
   const now = Date.now();
+  // 计算持仓时长（分钟）
   const heldMinutes = (now - position.time) / 60000;
-  if (heldMinutes >= config.maxPositionMinutes) {
-    const side = position.side === 'BUY' ? 'SELL' : 'BUY';
+  // 当前持仓方向，BUY 做多，SELL 做空
+  const currentSide = position.side;
+
+  // 是否因持仓时间超限需要平仓
+  let shouldCloseByTime = heldMinutes >= config.maxPositionMinutes;
+  // 是否因当前信号反向需要平仓
+  let shouldCloseBySignal = false;
+
+  try {
+    // 调用策略分析函数，获取当前币种最新做多/做空信号
+    const { shouldLong, shouldShort } = await analyzeSymbol(symbol, config.interval);
+
+    // 如果持仓是做多，但最新信号是做空，则需要平仓
+    // 如果持仓是做空，但最新信号是做多，则需要平仓
+    if ((currentSide === 'BUY' && shouldShort) ||
+        (currentSide === 'SELL' && shouldLong)) {
+      shouldCloseBySignal = true;
+      log(`🔁 ${symbol} 当前信号与持仓方向相反，准备平仓`);
+      await sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
+    }
+  } catch (err) {
+    // 信号分析失败时记录错误，但不影响平仓判断（可根据需求调整）
+    log(`⚠️ ${symbol} 分析当前信号失败：${err.message}`);
+  }
+
+  // 满足持仓时间超限或信号反转任一条件则执行平仓操作
+  if (shouldCloseByTime || shouldCloseBySignal) {
+    // 平仓方向与当前持仓相反
+    const exitSide = currentSide === 'BUY' ? 'SELL' : 'BUY';
+    // 获取当前最新价格
     const price = await getCurrentPrice(symbol);
-    log(`🧯 ${symbol} 持仓超过 ${config.maxPositionMinutes} 分钟，自动平仓 ${side}`);
-    await sendTelegramMessage(`⚠️ ${symbol} 超时平仓：${side} @ 价格 ${price}`);
+    log(`🧯 ${symbol} 满足平仓条件，自动平仓 ${exitSide} @ ${price}`);
+    await sendTelegramMessage(`⚠️ ${symbol} 触发平仓：${exitSide} @ 价格 ${price}`);
+
     try {
       const timestamp = Date.now();
-      // ===== 获取精度并计算精确数量 =====
+      // 获取该交易对的数量精度，用于下单数量四舍五入
       const precision = getSymbolPrecision(symbol);
-      if (!precision) {
-        throw new Error(`未找到 ${symbol} 精度信息，无法平仓`);
-      }
+      if (!precision) throw new Error(`未找到 ${symbol} 精度信息`);
+
+      // 计算下单数量（注意应根据仓位大小和价格计算）
       const qtyRaw = await calcOrderQty(symbol, price);
-      const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
+      // 保留数量精度（数量是浮点数）
+      const qty = parseFloat(qtyRaw.toFixed(precision.quantityPrecision));
+
+      // 构造币安合约下单请求参数（市价单）
       const data = new URLSearchParams({
         symbol,
-        side,
+        side: exitSide,
         type: 'MARKET',
         quantity: qty,
         timestamp: timestamp.toString()
       });
+
+      // 签名生成
       const signature = crypto
         .createHmac('sha256', config.binance.apiSecret)
         .update(data.toString())
         .digest('hex');
 
+      // 请求 URL
       const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
       const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
+      // 发送下单请求
       await axios.post(finalUrl, null, { headers });
-      delete POSITION_DB[symbol]; // 清除本地持仓记录
+
+      // 清除本地持仓记录
+      delete POSITION_DB[symbol];
       log(`✅ ${symbol} 平仓成功`);
-      await sendTelegramMessage(`✅ ${symbol} 超时平仓成功`);
+      await sendTelegramMessage(`✅ ${symbol} 平仓成功`);
     } catch (err) {
+      // 下单失败，记录错误并通知
       log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
       await sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
     }
   } else {
-    log(`ℹ️ ${symbol} 持仓时长 ${heldMinutes.toFixed(1)} 分钟，未达到最大持仓时间`);
+    // 不满足平仓条件，输出当前持仓时间信息
+    log(`ℹ️ ${symbol} 持仓 ${heldMinutes.toFixed(1)} 分钟，未达平仓条件`);
   }
 }
 
