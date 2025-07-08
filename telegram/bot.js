@@ -3,7 +3,8 @@ const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { getCachedTopSymbols, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
 const { runStrategyCycle } = require('../strategy/runner');
-const { getSelectedSymbol } = require('../utils/cache'); // 确保已引入
+const { getSelectedSymbol } = require('../utils/cache');
+const { selectBestSymbols } = require('../strategy/selector');
 
 let bot;
 
@@ -30,16 +31,22 @@ async function initTelegramBot() {
 async function sendMainMenu() {
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
-    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
+    [{ text: '🔁 立即执行', callback_data: 'run_now' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
   ];
 
-  const topSymbols = getCachedTopSymbols();
-  if (topSymbols.length > 0) {
-    const longList = topSymbols.slice(0, 5).map(s => [{ text: `做多 ${s}`, callback_data: `long_${s}` }]);
-    const shortList = topSymbols.slice(0, 5).map(s => [{ text: `做空 ${s}`, callback_data: `short_${s}` }]);
-    buttons.push(...longList);
-    buttons.push(...shortList);
+  try {
+    const { longList, shortList } = await selectBestSymbols();
+    if (longList.length > 0) {
+      const longButtons = longList.map(item => [{ text: `做多 ${item.symbol}`, callback_data: `long_${item.symbol}` }]);
+      buttons.push(...longButtons);
+    }
+    if (shortList.length > 0) {
+      const shortButtons = shortList.map(item => [{ text: `做空 ${item.symbol}`, callback_data: `short_${item.symbol}` }]);
+      buttons.push(...shortButtons);
+    }
+  } catch (err) {
+    log('⚠️ 选币失败:', err.message);
   }
 
   await bot.sendMessage(config.telegram.chatId, '🎯 策略控制面板', {
@@ -68,16 +75,16 @@ async function handleCommand(data, chatId) {
     sendTelegramMessage('🚀 手动执行策略...');
     await runStrategyCycle();
   } else if (data === 'status') {
-    // ✅ 状态查询逻辑
     const selected = getSelectedSymbol();
     const statusText = `📊 当前策略状态：
-      - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
-      - 选中币种：${selected?.symbol || '无'}
-      - 方向：${selected?.symbol ? (selected?.symbol.includes('short') ? '做空' : '做多') : '无'}`;
+- 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
+- 选中币种：${selected?.symbol || '无'}
+- 方向：${selected?.symbol ? (selected?.symbol.includes('short') ? '做空' : '做多') : '无'}`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
-    await cacheTopSymbols();
+    await cacheTopSymbols(); // 刷新 Top50 缓存
     sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
+    await sendMainMenu();    // ⬅️ 关键：刷新按钮面板
   } else if (data.startsWith('long_') || data.startsWith('short_')) {
     const symbol = data.split('_')[1];
     const direction = data.startsWith('long_') ? '做多' : '做空';
