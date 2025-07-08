@@ -22,6 +22,9 @@ async function selectBestSymbols() {
   longCandidates.sort((a, b) => b.score - a.score);
   shortCandidates.sort((a, b) => b.score - a.score);
 
+  log(`📌 筛选出来的做多数据：${longCandidates}`);
+  log(`📌 筛选出来的做空数据：${shortCandidates}`);
+
   return {
     longList: longCandidates.slice(0, config.selectionCount),
     shortList: shortCandidates.slice(0, config.selectionCount)
