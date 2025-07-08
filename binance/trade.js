@@ -150,7 +150,6 @@ async function closePositionIfNeeded(symbol) {
     const { shouldLong, shouldShort } = await analyzeSymbol(symbol, config.interval);
 
     // 如果持仓是做多，但最新信号是做空，则需要平仓
-    // 如果持仓是做空，但最新信号是做多，则需要平仓
     if ((currentSide === 'BUY' && shouldShort) ||
         (currentSide === 'SELL' && shouldLong)) {
       shouldCloseBySignal = true;

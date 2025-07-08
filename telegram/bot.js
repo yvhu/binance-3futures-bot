@@ -5,6 +5,7 @@ const { getCachedTopSymbols, cacheSelectedSymbol, cacheTopSymbols } = require('.
 const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
 const { selectBestSymbols } = require('../strategy/selector');
+const { placeOrder } = require('../binance/trade');
 
 let bot;
 
@@ -87,9 +88,23 @@ async function handleCommand(data, chatId) {
     await sendMainMenu();    // ⬅️ 关键：刷新按钮面板
   } else if (data.startsWith('long_') || data.startsWith('short_')) {
     const symbol = data.split('_')[1];
+    const isLong = data.startsWith('long_');
     const direction = data.startsWith('long_') ? '做多' : '做空';
     cacheSelectedSymbol(symbol);
     sendTelegramMessage(`📌 已选择币种：${symbol}，方向：${direction}`);
+    try {
+      // ⬇️ ⬇️ ⬇️ ✅ 立即执行市价开仓（BUY 或 SELL）
+      const orderSide = isLong ? 'BUY' : 'SELL';
+      if (serviceStatus.running) {
+        await placeOrder(symbol, orderSide);// ✅ 策略运行时才下单
+      } else {
+        sendTelegramMessage('⚠️ 当前策略已暂停，仅缓存选币，不会下单');
+      }
+
+    } catch (err) {
+      // 报错已经在 placeOrder 内部处理，这里可以再打印日志
+      console.error(`下单失败: ${symbol}`, err.message);
+    }
   }
 }
 
