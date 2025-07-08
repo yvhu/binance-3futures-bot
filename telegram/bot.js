@@ -3,6 +3,7 @@ const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { getCachedTopSymbols, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
 const { runStrategyCycle } = require('../strategy/runner');
+const { getSelectedSymbol } = require('../utils/cache'); // 确保已引入
 
 let bot;
 
@@ -29,7 +30,7 @@ async function initTelegramBot() {
 async function sendMainMenu() {
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
-    [{ text: '🔁 立即执行', callback_data: 'run_now' }],
+    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
   ];
 
@@ -66,6 +67,14 @@ async function handleCommand(data, chatId) {
   } else if (data === 'run_now') {
     sendTelegramMessage('🚀 手动执行策略...');
     await runStrategyCycle();
+  } else if (data === 'status') {
+    // ✅ 状态查询逻辑
+    const selected = getSelectedSymbol();
+    const statusText = `📊 当前策略状态：
+      - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
+      - 选中币种：${selected?.symbol || '无'}
+      - 方向：${selected?.symbol ? (selected?.symbol.includes('short') ? '做空' : '做多') : '无'}`;
+    sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols();
     sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
