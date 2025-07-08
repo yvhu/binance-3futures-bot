@@ -20,7 +20,7 @@ module.exports = {
   // Telegram 配置
   telegram: {
     // Telegram 机器人 Token（可放入 .env 文件）
-    token: process.env.TELEGRAM_BOT_TOKEN || 'your-token',
+    token: process.env.TELEGRAM_TOKEN || 'your-token',
     // 目标聊天的 chatId，可是个人ID或群组ID
     chatId: process.env.TELEGRAM_CHAT_ID || 'your-chat-id'
   },
@@ -28,7 +28,7 @@ module.exports = {
   // 币安接口配置
   binance: {
     apiKey: process.env.BINANCE_API_KEY || 'your-token',
-    apiSecret: process.env.BINANCE_API_SECRET || 'your-token',
+    apiSecret: process.env.BINANCE_SECRET_KEY || 'your-token',
     // 币安合约交易接口基础地址（如需切换到测试网可改为 testnet 地址）
     baseUrl: 'https://fapi.binance.com',
     // 各种 API 接口路径
