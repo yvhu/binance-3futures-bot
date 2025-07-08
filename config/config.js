@@ -13,8 +13,23 @@ module.exports = {
   // 每次下单占用的USDT比例（如10%，即总资金的10%）
   positionRatio: 1.0,
 
+  // ================== EMA 均线设置 ==================
+  ema: {
+    shortPeriod: 7,     // 短期 EMA（如7）用于快速反应价格变化，常用于捕捉买卖信号
+    longPeriod: 21      // 长期 EMA（如21）用于趋势确认，与短期EMA形成金叉/死叉信号
+  },
+
+  // ================== 布林带指标设置 ==================
+  bb: {
+    period: 20,         // 布林带周期，表示使用多少根K线计算布林带（通常20为标准）
+    stdDev: 2           // 标准差倍数，用于确定上下轨距离（通常设置为2）
+  },
+
   // 连续阴线数量阈值（如达到3根阴线触发平仓）
   maxRedCandles: 3,
+
+  // 金叉/死叉后多少根K线内有效
+  signalValidCandles: 3,
 
   // 最大持仓时间（单位：分钟，超过后强制平仓）
   maxPositionMinutes: 180,
@@ -46,6 +61,8 @@ module.exports = {
     // Top50 币种列表缓存路径
     top50: './cache/top50.json',
     // 用户选择的交易币种缓存路径
-    selectedSymbol: './cache/selected-symbol.json'
+    selectedSymbol: './cache/selected-symbol.json',
+    // 新增：币种精度缓存路径
+    precision: './cache/precision.json'
   }
 };

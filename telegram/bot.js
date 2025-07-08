@@ -35,10 +35,10 @@ async function sendMainMenu() {
 
   const topSymbols = getCachedTopSymbols();
   if (topSymbols.length > 0) {
-    const longList = topSymbols.slice(0, 5).map(s => ({ text: `做多 ${s}`, callback_data: `long_${s}` }));
-    const shortList = topSymbols.slice(0, 5).map(s => ({ text: `做空 ${s}`, callback_data: `short_${s}` }));
-    buttons.push(longList);
-    buttons.push(shortList);
+    const longList = topSymbols.slice(0, 5).map(s => [{ text: `做多 ${s}`, callback_data: `long_${s}` }]);
+    const shortList = topSymbols.slice(0, 5).map(s => [{ text: `做空 ${s}`, callback_data: `short_${s}` }]);
+    buttons.push(...longList);
+    buttons.push(...shortList);
   }
 
   await bot.sendMessage(config.telegram.chatId, '🎯 策略控制面板', {

@@ -3,6 +3,9 @@ const config = require('../config/config');
 const { sendTelegramMessage } = require('../telegram/bot');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
+const { getCurrentPrice } = require('./price');      // 获取现价
+const { calcOrderQty } = require('./risk');          // 按仓位大小计算下单量
+const { getSymbolPrecision } = require('../utils/cache');
 
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
@@ -66,37 +69,38 @@ async function getUSDTBalance() {
  */
 async function placeOrder(symbol, side = 'BUY') {
   const price = await getCurrentPrice(symbol);
-  const qty = await calcOrderQty(symbol, price);
+  const qtyRaw = await calcOrderQty(symbol, price);
+  // === 获取币种精度并格式化数量 ===
+  const precision = getSymbolPrecision(symbol);
+  if (!precision) {
+    throw new Error(`找不到币种 ${symbol} 的精度信息`);
+  }
+  // 四舍五入到指定数量精度
+  const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
   const timestamp = Date.now();
-
-  // 组装请求参数
+  // 构造请求参数
   const data = new URLSearchParams({
     symbol,
     side,
-    type: 'MARKET',
+    type: 'MARKET',       // 市价单
     quantity: qty,
     timestamp: timestamp.toString()
   });
-
   // 生成签名
   const signature = crypto
     .createHmac('sha256', config.binance.apiSecret)
     .update(data.toString())
     .digest('hex');
-
   const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-
   try {
-    // 发送下单请求
+    // 执行下单请求
     const res = await axios.post(finalUrl, null, { headers });
-
-    // 记录持仓时间和方向（买多/卖空）
+    // 记录持仓方向和时间
     POSITION_DB[symbol] = {
       time: Date.now(),
       side
     };
-
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     await sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     return res.data;
@@ -112,28 +116,31 @@ async function placeOrder(symbol, side = 'BUY') {
  * 超过配置时间则强制平仓
  * @param {string} symbol 交易对
  */
+/**
+ * 检查是否需要超时平仓，如果超过 maxPositionMinutes 则自动平掉
+ */
 async function closePositionIfNeeded(symbol) {
   const position = POSITION_DB[symbol];
   if (!position) {
     log(`⚠️ ${symbol} 无持仓记录，无需平仓`);
     return;
   }
-
   const now = Date.now();
   const heldMinutes = (now - position.time) / 60000;
-
   if (heldMinutes >= config.maxPositionMinutes) {
-    // 平仓方向与持仓方向相反
     const side = position.side === 'BUY' ? 'SELL' : 'BUY';
     const price = await getCurrentPrice(symbol);
-
     log(`🧯 ${symbol} 持仓超过 ${config.maxPositionMinutes} 分钟，自动平仓 ${side}`);
     await sendTelegramMessage(`⚠️ ${symbol} 超时平仓：${side} @ 价格 ${price}`);
-
-    // 下市价单平仓
     try {
       const timestamp = Date.now();
-      const qty = await calcOrderQty(symbol, price);
+      // ===== 获取精度并计算精确数量 =====
+      const precision = getSymbolPrecision(symbol);
+      if (!precision) {
+        throw new Error(`未找到 ${symbol} 精度信息，无法平仓`);
+      }
+      const qtyRaw = await calcOrderQty(symbol, price);
+      const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
       const data = new URLSearchParams({
         symbol,
         side,
@@ -149,8 +156,7 @@ async function closePositionIfNeeded(symbol) {
       const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
       const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
       await axios.post(finalUrl, null, { headers });
-
-      delete POSITION_DB[symbol]; // 清理持仓缓存
+      delete POSITION_DB[symbol]; // 清除本地持仓记录
       log(`✅ ${symbol} 平仓成功`);
       await sendTelegramMessage(`✅ ${symbol} 超时平仓成功`);
     } catch (err) {

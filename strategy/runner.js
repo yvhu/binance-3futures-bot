@@ -11,9 +11,10 @@ async function runStrategyCycle() {
     log('⚠️ 未选择任何币种，跳过轮询');
     return;
   }
-
+  log(`📉 ${symbol} 开始分析信号`);
   const result = await analyzeSymbol(symbol, config.interval);
   await closePositionIfNeeded(symbol); // 检查是否应平仓
+  log(`📉 ${symbol} 做多做空信号`);
 
   if (result.shouldLong) {
     await placeOrder(symbol, 'BUY');

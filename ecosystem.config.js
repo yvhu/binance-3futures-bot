@@ -8,7 +8,8 @@ module.exports = {
       watch: false,
       max_memory_restart: '200M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        TZ: 'Asia/Shanghai' // ⬅️ 设置为北京时间
       }
     }
   ]
