@@ -4,13 +4,11 @@ const { sendTelegramMessage } = require('../telegram/bot');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
-const { analyzeSymbol } = require('../indicators/analyzer');
+const { shouldCloseByExitSignal } = require('../indicators/analyzer');
+const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
 
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
-
-// 简单持仓记录（内存缓存），生产环境建议持久化数据库
-const POSITION_DB = {};
 
 /**
  * 获取币种当前市场价格（USDT合约）
@@ -96,10 +94,10 @@ async function placeOrder(symbol, side = 'BUY') {
     // 执行下单请求
     const res = await axios.post(finalUrl, null, { headers });
     // 记录持仓方向和时间
-    POSITION_DB[symbol] = {
+    setPosition(symbol, {
       time: Date.now(),
       side
-    };
+    });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     await sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     return res.data;
@@ -128,7 +126,7 @@ async function placeOrder(symbol, side = 'BUY') {
  */
 async function closePositionIfNeeded(symbol) {
   // 从本地持仓记录中获取该币种的持仓信息
-  const position = POSITION_DB[symbol];
+  const position = getPosition(symbol);
   if (!position) {
     log(`⚠️ ${symbol} 无持仓记录，无需平仓`);
     return;
@@ -147,11 +145,11 @@ async function closePositionIfNeeded(symbol) {
 
   try {
     // 调用策略分析函数，获取当前币种最新做多/做空信号
-    const { shouldLong, shouldShort } = await analyzeSymbol(symbol, config.interval);
+    const { shouldLong, shouldShort } = await shouldCloseByExitSignal(symbol, config.interval);
 
     // 如果持仓是做多，但最新信号是做空，则需要平仓
     if ((currentSide === 'BUY' && shouldShort) ||
-        (currentSide === 'SELL' && shouldLong)) {
+      (currentSide === 'SELL' && shouldLong)) {
       shouldCloseBySignal = true;
       log(`🔁 ${symbol} 当前信号与持仓方向相反，准备平仓`);
       await sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
@@ -204,7 +202,7 @@ async function closePositionIfNeeded(symbol) {
       await axios.post(finalUrl, null, { headers });
 
       // 清除本地持仓记录
-      delete POSITION_DB[symbol];
+      removePosition(symbol);
       log(`✅ ${symbol} 平仓成功`);
       await sendTelegramMessage(`✅ ${symbol} 平仓成功`);
     } catch (err) {
