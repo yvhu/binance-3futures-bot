@@ -3,7 +3,6 @@ const config = require('../config/config');
 const { sendTelegramMessage } = require('../telegram/bot');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
-const { calcOrderQty } = require('./risk');          // 按仓位大小计算下单量
 const { getSymbolPrecision } = require('../utils/cache');
 
 // Binance 合约API基础地址，从配置读取
