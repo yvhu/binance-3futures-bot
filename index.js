@@ -5,6 +5,10 @@ const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ 未捕获的 Promise 异常：', reason);
+});
+
 (async () => {
   try {
     log('🚀 启动自动交易策略服务...');
