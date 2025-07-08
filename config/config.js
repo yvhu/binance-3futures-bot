@@ -11,7 +11,7 @@ module.exports = {
   leverage: 10,
 
   // 每次下单占用的USDT比例（如10%，即总资金的10%）
-  positionRatio: 1.0,
+  positionRatio: 0.9999,
 
   // ================== EMA 均线设置 ==================
   ema: {
