@@ -6,6 +6,7 @@ const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
 const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
+const { refreshPositionsFromBinance } = require('../utils/position');
 
 let bot;
 
@@ -33,7 +34,8 @@ async function sendMainMenu() {
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
-    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }]
+    [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
+    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
   ];
 
   try {
@@ -86,10 +88,13 @@ async function handleCommand(data, chatId) {
     await cacheTopSymbols(); // 刷新 Top50 缓存
     sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
     // 注意这里保留刷新按钮面板，因为如果T50数据都变了，那面板数据理应跟着改变
-    await sendMainMenu(); 
+    await sendMainMenu();
   } else if (data === 'refresh_signal') {
     await sendMainMenu(); // 单独刷新多空信号按钮面板
     sendTelegramMessage('🔄 已刷新多空数据按钮面板');
+  } else if (data === 'refresh_position') {
+    await refreshPositionsFromBinance();
+    sendTelegramMessage('📦 持仓已刷新（从币安获取最新）');
   } else if (data.startsWith('long_') || data.startsWith('short_')) {
     const symbol = data.split('_')[1];
     const isLong = data.startsWith('long_');
