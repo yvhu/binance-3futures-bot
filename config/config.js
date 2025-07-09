@@ -26,7 +26,7 @@ module.exports = {
   },
 
   // 连续阴线数量阈值（如达到3根阴线触发平仓）
-  maxRedCandles: 3,
+  maxRedOrGreenCandles: 3,
 
   // 连续K线数量判断平仓时的K线处于BOLL中线位置，默认为2
   continuousKlineCount: 2,
@@ -36,6 +36,12 @@ module.exports = {
 
   // 金叉/死叉后多少根K线内有效
   signalValidCandles: 3,
+
+  // 对比最近3根K线之前的价格
+  priceChangeLookBack: 3,
+
+  // 涨跌幅阈值5%
+  priceChangeThreshold: 0.05,
 
   // 最大持仓时间（单位：分钟，超过后强制平仓）
   maxPositionMinutes: 180,

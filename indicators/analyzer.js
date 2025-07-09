@@ -3,6 +3,7 @@ const { EMA, BollingerBands } = require('technicalindicators');
 const axios = require('axios');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
+const { getPosition } = require('../utils/position');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -48,7 +49,7 @@ async function analyzeSymbol(symbol, interval) {
   const limit = Math.max(
     config.ema.longPeriod + 5,
     config.bb.period + 5,
-    config.maxRedCandles + 5,
+    config.maxRedOrGreenCandles + 5,
     50
   );
   const klines = await fetchKlines(symbol, interval, limit);
@@ -129,9 +130,9 @@ async function analyzeSymbol(symbol, interval) {
   }
 
   // === 连续阴线过滤逻辑（防止逆势追多）===
-  const redCandleHit = countRedCandles(klines, config.maxRedCandles);
+  const redCandleHit = countRedCandles(klines, config.maxRedOrGreenCandles);
   if (redCandleHit) {
-    log(`⚠️ 连续出现 ${config.maxRedCandles}+ 根阴线，信号无效`);
+    log(`⚠️ 连续出现 ${config.maxRedOrGreenCandles}+ 根阴线，信号无效`);
   }
 
   // === 综合得分机制，可扩展 ===
@@ -210,6 +211,58 @@ async function shouldCloseByExitSignal(symbol, interval) {
   if (currentSide === 'SELL' && aboveCount === continuousCount) {
     shouldLong = true;
     log(`🔁 平空开多信号：连续 ${continuousCount} 根K线高于中轨`);
+  }
+
+  // === 配置涨跌幅阈值和比较的历史K线数量
+  const priceChangeLookBack = config.priceChangeLookBack || 3;    // 比较多少根K线前的价格
+  const priceChangeThreshold = config.priceChangeThreshold || 0.05; // 5%涨跌幅阈值
+
+  if (klines.length > priceChangeLookBack) {
+    const currentClose = closes[closes.length - 1];
+    const compareClose = closes[closes.length - 1 - priceChangeLookBack];
+    const changeRate = (currentClose - compareClose) / compareClose;
+
+    log(`📈 价格变化率(${priceChangeLookBack}根K线): ${(changeRate * 100).toFixed(2)}%`);
+
+    // 当前涨幅超过阈值，但持空，触发平空做多信号
+    if (changeRate > priceChangeThreshold && currentSide === 'SELL') {
+      shouldLong = true;
+      shouldShort = false;
+      log(`🔔 价格上涨超过${(priceChangeThreshold * 100)}%，持空 -> 触发平空做多`);
+    }
+
+    // 当前跌幅超过阈值，但持多，触发平多做空信号
+    if (changeRate < -priceChangeThreshold && currentSide === 'BUY') {
+      shouldShort = true;
+      shouldLong = false;
+      log(`🔔 价格下跌超过${(priceChangeThreshold * 100)}%，持多 -> 触发平多做空`);
+    }
+  }
+
+  // === 阴阳线连续反转判断 ===
+  const redGreenCount = config.maxRedOrGreenCandles || 3;
+
+  if (!shouldLong && !shouldShort && klines.length >= redGreenCount) {
+    let allRed = true;
+    let allGreen = true;
+
+    for (let i = klines.length - redGreenCount; i < klines.length; i++) {
+      const k = klines[i];
+      if (k.close >= k.open) allRed = false;   // 非红K线
+      if (k.close <= k.open) allGreen = false; // 非绿K线
+    }
+
+    // 当前持仓做多，且最近N根都是红K（阴线） → 平多做空
+    if (currentSide === 'BUY' && allRed) {
+      shouldShort = true;
+      log(`🔻 持多 → 检测到连续 ${redGreenCount} 根红K，触发反转做空`);
+    }
+
+    // 当前持仓做空，且最近N根都是绿K（阳线） → 平空做多
+    if (currentSide === 'SELL' && allGreen) {
+      shouldLong = true;
+      log(`🟢 持空 → 检测到连续 ${redGreenCount} 根绿K，触发反转做多`);
+    }
   }
 
   // === 若上述无信号，再检查最近 N 根K线内是否发生金叉或死叉 ===
