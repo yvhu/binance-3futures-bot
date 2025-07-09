@@ -1,6 +1,15 @@
+/**
+ * Telegram Bot 主要功能模块
+ * - 初始化 bot 实例
+ * - 绑定按钮事件和回调
+ * - 发送主菜单
+ * - 处理指令逻辑
+ */
+
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
+
 const { clearSelectedSymbol, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
 const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
@@ -8,40 +17,41 @@ const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
 const { refreshPositionsFromBinance } = require('../utils/position');
 
-let bot;
+const { setBot } = require('./state');
+const { sendTelegramMessage } = require('./messenger');
 
-// 策略状态（控制开启/暂停）
-const serviceStatus = {
+let serviceStatus = {
   running: false
 };
 
-// 初始化 Telegram Bot
+/**
+ * 初始化 Telegram Bot，启动监听，绑定回调事件
+ */
 async function initTelegramBot() {
-  bot = new TelegramBot(config.telegram.token, { polling: true });
+  const bot = new TelegramBot(config.telegram.token, { polling: true });
+  setBot(bot); // 设置全局 bot 实例，供其他模块获取
+
   log('🤖 Telegram Bot 已启动');
-  // 立即测试发送消息
-  await sendTelegramMessage('Bot初始化测试消息'); // ❌ 仍然可能失败！
+
   bot.on('callback_query', async (query) => {
     const data = query.data;
     const chatId = query.message.chat.id;
     await handleCommand(data, chatId);
   });
 
-  sendMainMenu();
+  await sendMainMenu();
 }
 
-// 封装发送信息函数
-function sendTelegramMessage(text) {
-  log(`🤖 Telegram Bot bot 已启动 ${bot}`);
-  log(`🤖 Telegram Bot chatId 已启动 ${config.telegram.chatId}`);
-  log(`🤖 Telegram Bot text 已启动 ${text}`);
-  if (bot && config.telegram.chatId && text) {
-    return bot.sendMessage(config.telegram.chatId, text);
-  }
-}
-
-// 发送主按钮菜单
+/**
+ * 发送主控制面板菜单按钮
+ */
 async function sendMainMenu() {
+  const bot = require('./state').getBot();
+  if (!bot) {
+    log('⚠️ 发送主菜单失败，bot 未初始化');
+    return;
+  }
+
   const buttons = [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
@@ -70,7 +80,11 @@ async function sendMainMenu() {
   });
 }
 
-// 处理按钮指令
+/**
+ * 处理 Telegram 按钮指令
+ * @param {string} data 按钮回调数据
+ * @param {number} chatId 用户聊天 ID
+ */
 async function handleCommand(data, chatId) {
   if (data === 'start') {
     serviceStatus.running = true;
@@ -102,19 +116,18 @@ async function handleCommand(data, chatId) {
   } else if (data.startsWith('long_') || data.startsWith('short_')) {
     const symbol = data.split('_')[1];
     const isLong = data.startsWith('long_');
-    const direction = data.startsWith('long_') ? '做多' : '做空';
+    const direction = isLong ? '做多' : '做空';
     cacheSelectedSymbol(symbol);
     sendTelegramMessage(`📌 已选择币种：${symbol}，方向：${direction}`);
+
     try {
-      // ⬇️ ⬇️ ⬇️ ✅ 立即执行市价开仓（BUY 或 SELL）
       const orderSide = isLong ? 'BUY' : 'SELL';
       if (serviceStatus.running) {
-        await placeOrder(symbol, orderSide);// ✅ 策略运行时才下单
+        await placeOrder(symbol, orderSide); // 策略运行时才下单
       } else {
         sendTelegramMessage('⚠️ 当前策略已暂停，仅缓存选币，不会下单');
       }
     } catch (err) {
-      // 报错已经在 placeOrder 内部处理，这里可以再打印日志
       console.error(`下单失败: ${symbol}`, err.message);
     }
   } else if (data === 'clear_selected') {
@@ -125,6 +138,6 @@ async function handleCommand(data, chatId) {
 
 module.exports = {
   initTelegramBot,
-  sendTelegramMessage,
+  sendTelegramMessage,   // 方便外部直接发送消息（内部会通过 state 获取bot）
   serviceStatus
 };
