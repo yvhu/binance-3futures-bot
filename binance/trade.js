@@ -112,11 +112,11 @@ async function placeOrder(symbol, side = 'BUY') {
       side
     });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
-    await sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
+    sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     return res.data;
   } catch (err) {
     log(`❌ 下单失败 ${side} ${symbol}:`, err.response?.data || err.message);
-    await sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${err.response?.data?.msg || err.message}`);
+    sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${err.response?.data?.msg || err.message}`);
     throw err;
   }
 }
@@ -165,7 +165,7 @@ async function closePositionIfNeeded(symbol) {
       (currentSide === 'SELL' && shouldLong)) {
       shouldCloseBySignal = true;
       log(`🔁 ${symbol} 当前信号与持仓方向相反，准备平仓`);
-      await sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
+      sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
     }
   } catch (err) {
     // 信号分析失败时记录错误，但不影响平仓判断（可根据需求调整）
@@ -179,7 +179,7 @@ async function closePositionIfNeeded(symbol) {
     // 获取当前最新价格
     const price = await getCurrentPrice(symbol);
     log(`🧯 ${symbol} 满足平仓条件，自动平仓 ${exitSide} @ ${price}`);
-    await sendTelegramMessage(`⚠️ ${symbol} 触发平仓：${exitSide} @ 价格 ${price}`);
+    sendTelegramMessage(`⚠️ ${symbol} 触发平仓：${exitSide} @ 价格 ${price}`);
     log(`开始自动平仓`);
     try {
       const timestamp = Date.now();
@@ -217,11 +217,11 @@ async function closePositionIfNeeded(symbol) {
       // 清除本地持仓记录
       removePosition(symbol);
       log(`✅ ${symbol} 平仓成功`);
-      await sendTelegramMessage(`✅ ${symbol} 平仓成功`);
+      sendTelegramMessage(`✅ ${symbol} 平仓成功`);
     } catch (err) {
       // 下单失败，记录错误并通知
       log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
-      await sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
+      sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
     }
   } else {
     // 不满足平仓条件，输出当前持仓时间信息
