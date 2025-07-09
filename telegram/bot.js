@@ -8,12 +8,7 @@ const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
 const { refreshPositionsFromBinance } = require('../utils/position');
 
-let bot = null;
-
-
-function getBot() {
-  return bot;
-}
+let bot;
 
 // 策略状态（控制开启/暂停）
 const serviceStatus = {
@@ -24,7 +19,8 @@ const serviceStatus = {
 async function initTelegramBot() {
   bot = new TelegramBot(config.telegram.token, { polling: true });
   log('🤖 Telegram Bot 已启动');
-
+  // 立即测试发送消息
+  await sendTelegramMessage('Bot初始化测试消息'); // ❌ 仍然可能失败！
   bot.on('callback_query', async (query) => {
     const data = query.data;
     const chatId = query.message.chat.id;
@@ -36,12 +32,11 @@ async function initTelegramBot() {
 
 // 封装发送信息函数
 function sendTelegramMessage(text) {
-  const newBot = getBot();
-  log(`🤖 Telegram Bot bot 已启动 ${newBot}`);
+  log(`🤖 Telegram Bot bot 已启动 ${bot}`);
   log(`🤖 Telegram Bot chatId 已启动 ${config.telegram.chatId}`);
   log(`🤖 Telegram Bot text 已启动 ${text}`);
-  if (newBot && config.telegram.chatId && text) {
-    return newBot.sendMessage(config.telegram.chatId, text);
+  if (bot && config.telegram.chatId && text) {
+    return bot.sendMessage(config.telegram.chatId, text);
   }
 }
 
@@ -131,6 +126,5 @@ async function handleCommand(data, chatId) {
 module.exports = {
   initTelegramBot,
   sendTelegramMessage,
-  serviceStatus,
-  getBot
+  serviceStatus
 };
