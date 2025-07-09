@@ -36,7 +36,7 @@ const cacheTopSymbols = async () => {
     if (info) {
       const priceFilter = info.filters.find(f => f.filterType === 'PRICE_FILTER');
       const lotSizeFilter = info.filters.find(f => f.filterType === 'LOT_SIZE');
-
+      const notionalFilter = info.filters.find(f => f.filterType === 'MIN_NOTIONAL');
       symbolPrecisions[symbol] = {
         pricePrecision: getDecimalPlaces(priceFilter.tickSize),
         quantityPrecision: getDecimalPlaces(lotSizeFilter.stepSize),
