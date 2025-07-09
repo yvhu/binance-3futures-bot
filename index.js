@@ -4,7 +4,7 @@ const { startScheduler } = require('./scheduler/cron');
 const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
-const { sendTelegramMessage } = require('../telegram/bot');
+const { sendTelegramMessage } = require('./telegram/bot');
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未捕获的 Promise 异常：', reason);
