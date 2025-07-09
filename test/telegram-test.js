@@ -1,22 +1,27 @@
 // 测试脚本（不依赖主项目）
-const { sendTelegramMessage } = require('../telegram/bot');
-const config = require('../config/config');
+const fs = require('fs');
+const path = require('path');
 
-(async () => {
+// 日志文件路径
+const logFile = path.join(__dirname, 'telegram-test.log');
+
+async function testTelegram() {
+  const { sendTelegramMessage } = require('../telegram/bot');
+  
+  const logMessage = (msg) => {
+    const timestamp = new Date().toISOString();
+    const line = `[${timestamp}] ${msg}\n`;
+    fs.appendFileSync(logFile, line);
+    console.log(line.trim());
+  };
+
   try {
-    console.log('=== 开始Telegram消息测试 ===');
-    
-    // 测试1：发送简单文本
-    await sendTelegramMessage('🔧 测试消息: 基础功能验证');
-    console.log('✅ 测试消息1发送成功');
-
-    // 测试2：发送长文本+特殊字符
-    await sendTelegramMessage(`📊 压力测试:\n${'A'.repeat(200)}\n@#$%^&*()`);
-    console.log('✅ 测试消息2发送成功');
-
+    logMessage('=== 开始测试 ===');
+    await sendTelegramMessage('🛠️ 测试消息 from standalone script');
+    logMessage('✅ 消息发送成功');
   } catch (err) {
-    console.error('❌ 测试失败:', err);
-  } finally {
-    process.exit();
+    logMessage(`❌ 测试失败: ${err.message}`);
   }
-})();
+}
+
+testTelegram();
