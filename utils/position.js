@@ -79,13 +79,14 @@ async function refreshPositionsFromBinance() {
 
     for (const pos of allPositions) {
       const symbol = pos.symbol;
-      const positionAmt = parseFloat(pos.positionAmt);
-      if (positionAmt === 0) continue; // 忽略空仓
+      const amt = parseFloat(pos.positionAmt);
+      if (amt === 0) continue; // 忽略空仓
 
-      const side = positionAmt > 0 ? 'BUY' : 'SELL';
+      const side = amt > 0 ? 'BUY' : 'SELL';
       const time = Date.now();
+      const positionAmt = pos.positionAmt;
 
-      setPosition(symbol, { time, side });
+      setPosition(symbol, { time, side, positionAmt });
     }
 
     log(`✅ 已从币安刷新持仓，共 ${allPositions.filter(p => parseFloat(p.positionAmt) !== 0).length} 个币种`);
