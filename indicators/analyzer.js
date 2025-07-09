@@ -4,6 +4,7 @@ const axios = require('axios');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { getPosition } = require('../utils/position');
+const { countRedCandles, countGreenCandles } = require('../utils/filters')
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -18,11 +19,6 @@ async function fetchKlines(symbol, interval, limit = 50) {
     close: parseFloat(k[4]),
     volume: parseFloat(k[5])
   }));
-}
-
-// 是否连续出现 N 根阴线
-function countRedCandles(klines, count) {
-  return klines.slice(-count).every(k => k.close < k.open);
 }
 
 // 判断单根K线是否为阴线
@@ -76,6 +72,7 @@ async function analyzeSymbol(symbol, interval) {
   const recentCandles = config.signalValidCandles || 3;
   let shouldLong = false;
   let shouldShort = false;
+  log(`🔄 检测到金叉+连续阴线 或 死叉+连续阳线，判定为震荡，信号作废`);
 
   // === 查找最近的金叉或死叉信号 ===
   let crossIndex = -1;
@@ -131,8 +128,19 @@ async function analyzeSymbol(symbol, interval) {
 
   // === 连续阴线过滤逻辑（防止逆势追多）===
   const redCandleHit = countRedCandles(klines, config.maxRedOrGreenCandles);
+  const greenCandleHit = countGreenCandles(klines, config.maxRedOrGreenCandles);
   if (redCandleHit) {
-    log(`⚠️ 连续出现 ${config.maxRedOrGreenCandles}+ 根阴线，信号无效`);
+    log(`⚠️ 连续出现 ${config.maxRedOrGreenCandles}+ 根阴线`);
+  }
+  if (greenCandleHit) {
+    log(`⚠️ 连续出现 ${config.maxRedOrGreenCandles}+ 根阳线`);
+  }
+
+  // === 新增逻辑：若金叉 + 连续阴线，或 死叉 + 连续阳线，认为为震荡行情 ===
+  if ((shouldLong && redCandleHit) || (shouldShort && greenCandleHit)) {
+    shouldLong = false;
+    shouldShort = false;
+    log(`🔄 检测到金叉+连续阴线 或 死叉+连续阳线，判定为震荡，信号作废`);
   }
 
   // === 综合得分机制，可扩展 ===
