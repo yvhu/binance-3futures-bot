@@ -220,7 +220,7 @@ async function closePositionIfNeeded(symbol) {
         const res = await axios.post(finalUrl, null, { headers });
         log(`币安平仓接口响应：`, res.data);
 
-        if (res.data.status !== 'FILLED') {
+        if (res.data.status !== 'FILLED' && parseFloat(res.data.executedQty) === 0) {
           log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
           sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，请手动确认`);
           return;  // 不清理本地持仓，等待后续成交或人工处理
