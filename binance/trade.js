@@ -198,7 +198,9 @@ async function closePositionIfNeeded(symbol) {
         side: exitSide,
         type: 'MARKET',
         quantity: qty,
-        timestamp: timestamp.toString()
+        timestamp: timestamp.toString(),
+        reduceOnly: 'true',       // 关键参数，确保只减少持仓
+        closePosition: 'true'     // 关键参数，关闭当前仓位
       });
 
       // 签名生成
@@ -216,11 +218,13 @@ async function closePositionIfNeeded(symbol) {
         const res = await axios.post(finalUrl, null, { headers });
         log(`币安平仓接口响应：`, res.data);
 
-        // 判断订单是否完全成交，可能要检查 res.data.status、executedQty 等字段
-        if (res.data.status !== 'FILLED' && res.data.status !== 'PARTIALLY_FILLED') {
-          throw new Error(`订单状态非已成交: ${res.data.status}`);
+        if (res.data.status !== 'FILLED') {
+          log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
+          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，请手动确认`);
+          return;  // 不清理本地持仓，等待后续成交或人工处理
         }
 
+        // 订单成交成功
         removePosition(symbol);
         log(`✅ ${symbol} 平仓成功`);
         sendTelegramMessage(`✅ ${symbol} 平仓成功`);
