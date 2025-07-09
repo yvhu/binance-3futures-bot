@@ -21,17 +21,6 @@ async function fetchKlines(symbol, interval, limit = 50) {
   }));
 }
 
-// 判断单根K线是否为阴线
-function isRedCandle(k) {
-  return k.close < k.open;
-}
-
-// 判断最近N根K线是否全部为阴线
-function countRedCandles(klines, n) {
-  return klines.slice(-n).every(isRedCandle);
-}
-
-
 /**
  * 分析某币种是否具备做多或做空信号
  * @param {string} symbol - 币种，例如 BTCUSDT
