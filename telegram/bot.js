@@ -15,7 +15,7 @@ const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
 const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
-const { refreshPositionsFromBinance } = require('../utils/position');
+const { refreshPositionsFromBinance, getPosition } = require('../utils/position');
 
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
@@ -97,10 +97,22 @@ async function handleCommand(data, chatId) {
     await runStrategyCycle();
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
+    const symbol = selected?.symbol;
+    let directionText = '无';
+    if (symbol) {
+      const position = getPosition(symbol);
+      if (position?.side === 'BUY') {
+        directionText = '做多';
+      } else if (position?.side === 'SELL') {
+        directionText = '做空';
+      } else {
+        directionText = '未持仓';
+      }
+    }
     const statusText = `📊 当前策略状态：
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
 - 选中币种：${selectedSymbol || '无'}
-- 方向：${selectedSymbol?.toLowerCase().includes('short') ? '做空' : (selectedSymbol ? '做多' : '无')}`;
+- 方向：${directionText}`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
