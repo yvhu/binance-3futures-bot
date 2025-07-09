@@ -108,9 +108,10 @@ async function placeOrder(symbol, side = 'BUY') {
     const res = await axios.post(finalUrl, null, { headers });
     // === 这里记录持仓数量 ===
     // res.data.executedQty 是字符串，需转数字
+    log(`📥 下单成功回调数据 ${res.data.executedQty}`);
     const executedQty = parseFloat(res.data.executedQty);
     // 持仓数量带方向，买多为正，卖空为负
-    const positionAmt = side === 'BUY' ? executedQty : -executedQty;
+    const positionAmt = side === 'BUY' ? qty : -qty;
     // 记录持仓方向和时间
     setPosition(symbol, {
       time: Date.now(),
@@ -204,6 +205,7 @@ async function closePositionIfNeeded(symbol) {
         side: exitSide,
         type: 'MARKET',
         quantity: Math.abs(position.positionAmt),
+        timestamp: timestamp.toString(),
         reduceOnly: 'true',       // 关键参数，确保只减少持仓
       });
 
