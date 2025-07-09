@@ -39,8 +39,11 @@ const cacheTopSymbols = async () => {
 
       symbolPrecisions[symbol] = {
         pricePrecision: getDecimalPlaces(priceFilter.tickSize),
-        quantityPrecision: getDecimalPlaces(lotSizeFilter.stepSize)
+        quantityPrecision: getDecimalPlaces(lotSizeFilter.stepSize),
+        minQty: parseFloat(lotSizeFilter.minQty),     // ✅ 最小下单数量
+        minNotional: parseFloat(notionalFilter?.notional || 5) // 可选：最小名义金额
       };
+
     }
   });
 

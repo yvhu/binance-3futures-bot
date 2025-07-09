@@ -29,12 +29,25 @@ async function getCurrentPrice(symbol) {
  * @returns {number} 下单数量（张数，保留3位小数）
  */
 async function calcOrderQty(symbol, price) {
-  // 获取账户USDT可用余额
   const usdtBalance = await getUSDTBalance();
-  const totalUSDT = usdtBalance * config.positionRatio; // 例如全仓为1.0
-  // 计算合约张数 = (USDT金额 * 杠杆) / 当前价格
-  const qty = (totalUSDT * config.leverage) / price;
-  return parseFloat(qty.toFixed(3));
+  const totalUSDT = usdtBalance * config.positionRatio;
+  // 计算原始张数（未处理精度）
+  let rawQty = (totalUSDT * config.leverage) / price;
+  // === 获取币种精度信息（pricePrecision, quantityPrecision）===
+  const precision = getSymbolPrecision(symbol);
+  if (!precision) {
+    throw new Error(`❌ 未找到 ${symbol} 精度信息，无法计算下单数量`);
+  }
+  const qtyPrecision = precision.quantityPrecision;
+  const minQty = precision.minQty || 0; // 可以从 cache 精度中扩展存储 minQty
+  // === 按精度保留小数位 ===
+  const fixedQty = parseFloat(rawQty.toFixed(qtyPrecision));
+  // === 防止数量小于最小下单数量 ===
+  if (fixedQty <= 0 || (minQty && fixedQty < minQty)) {
+    log(`❌ 计算后数量过小: ${fixedQty}，小于最小要求`);
+    return 0;
+  }
+  return fixedQty;
 }
 
 /**
