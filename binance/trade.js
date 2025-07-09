@@ -203,10 +203,8 @@ async function closePositionIfNeeded(symbol) {
         symbol,
         side: exitSide,
         type: 'MARKET',
-        quantity: position.positionAmt,
-        timestamp: timestamp.toString(),
-        // reduceOnly: 'true',       // 关键参数，确保只减少持仓
-        // closePosition: 'true'     // 关键参数，关闭当前仓位
+        quantity: Math.abs(position.positionAmt),
+        reduceOnly: 'true',       // 关键参数，确保只减少持仓
       });
 
       // 签名生成

@@ -84,7 +84,7 @@ async function refreshPositionsFromBinance() {
 
       const side = amt > 0 ? 'BUY' : 'SELL';
       const time = Date.now();
-      const positionAmt = pos.positionAmt;
+      const positionAmt = amt;
 
       setPosition(symbol, { time, side, positionAmt });
     }
