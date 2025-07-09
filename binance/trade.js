@@ -222,7 +222,7 @@ async function closePositionIfNeeded(symbol) {
 
         if (res.data.status !== 'FILLED' && parseFloat(res.data.executedQty) === 0) {
           log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
-          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，请手动确认`);
+          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
           return;  // 不清理本地持仓，等待后续成交或人工处理
         }
 
