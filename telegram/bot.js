@@ -8,23 +8,17 @@ const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
 const { refreshPositionsFromBinance } = require('../utils/position');
 
-let bot;
+let bot = null;
+
+
+function getBot() {
+  return bot;
+}
 
 // 策略状态（控制开启/暂停）
 const serviceStatus = {
   running: false
 };
-
-
-// 封装发送信息函数
-function sendTelegramMessage(text) {
-  log(`🤖 Telegram Bot bot 已启动 ${bot}`);
-  log(`🤖 Telegram Bot chatId 已启动 ${config.telegram.chatId}`);
-  log(`🤖 Telegram Bot text 已启动 ${text}`);
-  if (bot && config.telegram.chatId && text) {
-    return bot.sendMessage(config.telegram.chatId, text);
-  }
-}
 
 // 初始化 Telegram Bot
 async function initTelegramBot() {
@@ -38,6 +32,17 @@ async function initTelegramBot() {
   });
 
   sendMainMenu();
+}
+
+// 封装发送信息函数
+function sendTelegramMessage(text) {
+  const newBot = getBot();
+  log(`🤖 Telegram Bot bot 已启动 ${newBot}`);
+  log(`🤖 Telegram Bot chatId 已启动 ${config.telegram.chatId}`);
+  log(`🤖 Telegram Bot text 已启动 ${text}`);
+  if (newBot && config.telegram.chatId && text) {
+    return newBot.sendMessage(config.telegram.chatId, text);
+  }
 }
 
 // 发送主按钮菜单
@@ -126,5 +131,6 @@ async function handleCommand(data, chatId) {
 module.exports = {
   initTelegramBot,
   sendTelegramMessage,
-  serviceStatus
+  serviceStatus,
+  getBot
 };
