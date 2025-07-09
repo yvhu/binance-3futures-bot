@@ -73,12 +73,41 @@ async function getUSDTBalance() {
 }
 
 /**
+ * 设置杠杆倍数
+ * @param {string} symbol 交易对，例如 BTCUSDT
+ * @param {string} leverage 
+ */
+async function setLeverage(symbol, leverage) {
+  const timestamp = Date.now();
+  const params = new URLSearchParams({
+    symbol,
+    leverage: leverage.toString(),
+    timestamp: timestamp.toString()
+  });
+  const signature = crypto
+    .createHmac('sha256', config.binance.apiSecret)
+    .update(params.toString())
+    .digest('hex');
+  const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
+  const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+  try {
+    const res = await axios.post(url, null, { headers });
+    log(`✅ 设置杠杆成功 ${symbol}：${leverage}x`);
+    return res.data;
+  } catch (err) {
+    log(`❌ 设置杠杆失败 ${symbol}:`, err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
  * 市价下单接口（全仓操作）
  * @param {string} symbol 交易对，例如 BTCUSDT
  * @param {string} side 买入BUY 或 卖出SELL
  */
 async function placeOrder(symbol, side = 'BUY') {
   const price = await getCurrentPrice(symbol);
+  await setLeverage(symbol, config.leverage); // 👈 仅首次设置有效，重复设置也没影响
   const qtyRaw = await calcOrderQty(symbol, price);
   // === 获取币种精度并格式化数量 ===
   const precision = getSymbolPrecision(symbol);
@@ -220,11 +249,11 @@ async function closePositionIfNeeded(symbol) {
         const res = await axios.post(finalUrl, null, { headers });
         log(`币安平仓接口响应：`, res.data);
 
-        if (res.data.status !== 'FILLED' && parseFloat(res.data.executedQty) === 0) {
-          log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
-          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
-          return;  // 不清理本地持仓，等待后续成交或人工处理
-        }
+        // if (!res.data) {
+        //   log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
+        //   sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
+        //   return;  // 不清理本地持仓，等待后续成交或人工处理
+        // }
 
         // 订单成交成功
         removePosition(symbol);
