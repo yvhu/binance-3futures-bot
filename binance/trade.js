@@ -1,6 +1,6 @@
 const axios = require('axios');
 const config = require('../config/config');
-const { sendTelegramMessage } = require('../telegram/bot');
+const { sendTelegramMessage } = require('../telegram/messenger');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
