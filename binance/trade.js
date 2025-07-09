@@ -106,10 +106,16 @@ async function placeOrder(symbol, side = 'BUY') {
   try {
     // 执行下单请求
     const res = await axios.post(finalUrl, null, { headers });
+    // === 这里记录持仓数量 ===
+    // res.data.executedQty 是字符串，需转数字
+    const executedQty = parseFloat(res.data.executedQty);
+    // 持仓数量带方向，买多为正，卖空为负
+    const positionAmt = side === 'BUY' ? executedQty : -executedQty;
     // 记录持仓方向和时间
     setPosition(symbol, {
       time: Date.now(),
-      side
+      side,
+      positionAmt  // 记录持仓数量
     });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
@@ -184,23 +190,23 @@ async function closePositionIfNeeded(symbol) {
     try {
       const timestamp = Date.now();
       // 获取该交易对的数量精度，用于下单数量四舍五入
-      const precision = getSymbolPrecision(symbol);
-      if (!precision) throw new Error(`未找到 ${symbol} 精度信息`);
+      // const precision = getSymbolPrecision(symbol);
+      // if (!precision) throw new Error(`未找到 ${symbol} 精度信息`);
 
       // 计算下单数量（注意应根据仓位大小和价格计算）
-      const qtyRaw = await calcOrderQty(symbol, price);
+      // const qtyRaw = await calcOrderQty(symbol, price);
       // 保留数量精度（数量是浮点数）
-      const qty = parseFloat(qtyRaw.toFixed(precision.quantityPrecision));
+      // const qty = parseFloat(qtyRaw.toFixed(precision.quantityPrecision));
 
       // 构造币安合约下单请求参数（市价单）
       const data = new URLSearchParams({
         symbol,
         side: exitSide,
         type: 'MARKET',
-        quantity: qty,
+        quantity: position.positionAmt,
         timestamp: timestamp.toString(),
-        reduceOnly: 'true',       // 关键参数，确保只减少持仓
-        closePosition: 'true'     // 关键参数，关闭当前仓位
+        // reduceOnly: 'true',       // 关键参数，确保只减少持仓
+        // closePosition: 'true'     // 关键参数，关闭当前仓位
       });
 
       // 签名生成
