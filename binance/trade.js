@@ -180,7 +180,7 @@ async function closePositionIfNeeded(symbol) {
     const price = await getCurrentPrice(symbol);
     log(`🧯 ${symbol} 满足平仓条件，自动平仓 ${exitSide} @ ${price}`);
     await sendTelegramMessage(`⚠️ ${symbol} 触发平仓：${exitSide} @ 价格 ${price}`);
-
+    log(`开始自动平仓`);
     try {
       const timestamp = Date.now();
       // 获取该交易对的数量精度，用于下单数量四舍五入
