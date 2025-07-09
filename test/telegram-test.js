@@ -17,7 +17,11 @@ async function testTelegram() {
 
   try {
     logMessage('=== 开始测试 ===');
-    await sendTelegramMessage('🛠️ 测试消息 from standalone script');
+    try {
+        await sendTelegramMessage('🛠️ 测试消息 from standalone script');
+    } catch (error) {
+        logMessage(`❌ 测试失败: ${error.message}`);
+    }
     logMessage('✅ 消息发送成功');
   } catch (err) {
     logMessage(`❌ 测试失败: ${err.message}`);

@@ -18,13 +18,12 @@ const serviceStatus = {
 
 // 封装发送信息函数
 function sendTelegramMessage(text) {
+  log(`🤖 Telegram Bot bot 已启动 ${bot}`);
+  log(`🤖 Telegram Bot chatId 已启动 ${config.telegram.chatId}`);
+  log(`🤖 Telegram Bot text 已启动 ${text}`);
   if (bot && config.telegram.chatId && text) {
-    return bot.sendMessage(config.telegram.chatId, text)
-      .catch(err => {
-        log(`❌ Telegram 消息发送失败: ${err.message}`);
-      });
+    return bot.sendMessage(config.telegram.chatId, text);
   }
-  return Promise.resolve();
 }
 
 // 初始化 Telegram Bot
