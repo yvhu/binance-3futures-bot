@@ -97,10 +97,9 @@ async function handleCommand(data, chatId) {
     await runStrategyCycle();
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
-    const symbol = selected?.symbol;
     let directionText = '无';
-    if (symbol) {
-      const position = getPosition(symbol);
+    if (selectedSymbol) {
+      const position = getPosition(selectedSymbol);
       if (position?.side === 'BUY') {
         directionText = '做多';
       } else if (position?.side === 'SELL') {
