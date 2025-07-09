@@ -212,12 +212,23 @@ async function closePositionIfNeeded(symbol) {
       const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
 
       // 发送下单请求
-      await axios.post(finalUrl, null, { headers });
+      try {
+        const res = await axios.post(finalUrl, null, { headers });
+        log(`币安平仓接口响应：`, res.data);
 
-      // 清除本地持仓记录
-      removePosition(symbol);
-      log(`✅ ${symbol} 平仓成功`);
-      sendTelegramMessage(`✅ ${symbol} 平仓成功`);
+        // 判断订单是否完全成交，可能要检查 res.data.status、executedQty 等字段
+        if (res.data.status !== 'FILLED' && res.data.status !== 'PARTIALLY_FILLED') {
+          throw new Error(`订单状态非已成交: ${res.data.status}`);
+        }
+
+        removePosition(symbol);
+        log(`✅ ${symbol} 平仓成功`);
+        sendTelegramMessage(`✅ ${symbol} 平仓成功`);
+      } catch (err) {
+        log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
+        sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
+      }
+
     } catch (err) {
       // 下单失败，记录错误并通知
       log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
