@@ -15,6 +15,14 @@ const serviceStatus = {
   running: false
 };
 
+
+// 封装发送信息函数
+function sendTelegramMessage(text) {
+  if (bot && config.telegram.chatId && text) {
+    return bot.sendMessage(config.telegram.chatId, text);
+  }
+}
+
 // 初始化 Telegram Bot
 async function initTelegramBot() {
   bot = new TelegramBot(config.telegram.token, { polling: true });
@@ -57,13 +65,6 @@ async function sendMainMenu() {
       inline_keyboard: buttons
     }
   });
-}
-
-// 封装发送信息函数
-function sendTelegramMessage(text) {
-  if (bot && config.telegram.chatId && text) {
-    return bot.sendMessage(config.telegram.chatId, text);
-  }
 }
 
 // 处理按钮指令
