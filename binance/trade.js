@@ -146,7 +146,7 @@ async function closePositionIfNeeded(symbol) {
   try {
     // 调用策略分析函数，获取当前币种最新做多/做空信号
     const { shouldLong, shouldShort } = await shouldCloseByExitSignal(symbol, config.interval);
-
+    log(`⚠️ ${shouldLong}、${shouldShort} 当前信号`);
     // 如果持仓是做多，但最新信号是做空，则需要平仓
     if ((currentSide === 'BUY' && shouldShort) ||
       (currentSide === 'SELL' && shouldLong)) {

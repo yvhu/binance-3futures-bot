@@ -146,7 +146,7 @@ async function analyzeSymbol(symbol, interval) {
 async function shouldCloseByExitSignal(symbol, interval) {
   log(`🔍 分析币种: ${symbol}, 周期: ${interval}`);
 
-  // === 计算所需K线数量，确保指标足够计算 ===
+  // === 拉取足够的K线数量，供指标计算 ===
   const limit = Math.max(
     config.ema.longPeriod + 5,
     config.bb.period + 5,
@@ -160,14 +160,11 @@ async function shouldCloseByExitSignal(symbol, interval) {
     return { shouldLong: false, shouldShort: false, score: -999 };
   }
 
-  // 提取收盘价数组
   const closes = klines.map(k => k.close);
 
-  // === 计算 EMA（短期 & 长期） ===
+  // === 指标计算 ===
   const emaShort = EMA.calculate({ period: config.ema.shortPeriod, values: closes });
   const emaLong = EMA.calculate({ period: config.ema.longPeriod, values: closes });
-
-  // === 计算布林带中轨线（basis） ===
   const bb = BollingerBands.calculate({
     period: config.bb.period,
     stdDev: config.bb.stdDev,
@@ -175,76 +172,82 @@ async function shouldCloseByExitSignal(symbol, interval) {
   });
 
   const continuousCount = config.continuousKlineCount || 2;
-
   let shouldLong = false;
   let shouldShort = false;
 
-  // === 金叉/死叉判断，仅识别最近一次交叉类型（避免冲突） ===
-  if (emaShort.length >= 2 && emaLong.length >= 2) {
-    const lastIdx = emaLong.length - 1;
-    const prevIdx = lastIdx - 1;
+  // === 获取当前持仓信息 ===
+  const position = getPosition(symbol);
+  const currentSide = position?.side; // 'BUY' 或 'SELL'
+  log(`📌 当前持仓方向: ${currentSide || '无'}`);
 
-    const prevShort = emaShort[prevIdx];
-    const prevLong = emaLong[prevIdx];
-    const currShort = emaShort[lastIdx];
-    const currLong = emaLong[lastIdx];
-
-    const crossType = (() => {
-      if (prevShort < prevLong && currShort > currLong) return 'golden';
-      if (prevShort > prevLong && currShort < currLong) return 'death';
-      return null;
-    })();
-
-    if (crossType === 'golden') {
-      shouldLong = true;
-      log(`🟢 检测到最近金叉：EMA短期由下向上穿越长期`);
-    } else if (crossType === 'death') {
-      shouldShort = true;
-      log(`🔴 检测到最近死叉：EMA短期由上向下穿越长期`);
-    } else {
-      log(`⚠️ 当前和前一根K线未检测到有效交叉`);
-    }
-  } else {
-    log('⚠️ EMA计算长度不足，跳过交叉判断');
+  // === 只在存在持仓时执行中轨反向判断 ===
+  const bbStartIndex = bb.length - klines.length;
+  if (bbStartIndex < 0) {
+    log('⚠️ 布林带结果长度与K线不匹配');
+    return { shouldLong: false, shouldShort: false, score: 0 };
   }
 
-  // === 布林带中轨连续判断（在无交叉信号时启用） ===
-  if (!shouldLong && !shouldShort) {
-    const bbStartIndex = bb.length - klines.length;
-    if (bbStartIndex < 0) {
-      log('⚠️ 布林带结果长度与K线不匹配');
-      return { shouldLong: false, shouldShort: false, score: 0 };
+  let aboveCount = 0;   // 统计连续收盘价高于布林带中轨（basis）的次数
+  let belowCount = 0;   // 统计连续收盘价低于布林带中轨（basis）的次数
+
+  // 遍历最近 continuousCount 根K线
+  for (let i = klines.length - continuousCount; i < klines.length; i++) {
+    const close = closes[i];                         // 当前K线的收盘价
+    const basis = bb[i - bbStartIndex].middle;       // 当前K线对应的布林带中轨（需对齐bb数组索引）
+
+    if (close >= basis) aboveCount++;                // 如果收盘价高于或等于中轨，增加 aboveCount
+    if (close <= basis) belowCount++;                // 如果收盘价低于或等于中轨，增加 belowCount
+  }
+
+
+  // === 持仓是做多：连续收盘在中轨下方 → 平多做空
+  if (currentSide === 'BUY' && belowCount === continuousCount) {
+    shouldShort = true;
+    log(`🔁 平多开空信号：连续 ${continuousCount} 根K线低于中轨`);
+  }
+
+  // === 持仓是做空：连续收盘在中轨上方 → 平空做多
+  if (currentSide === 'SELL' && aboveCount === continuousCount) {
+    shouldLong = true;
+    log(`🔁 平空开多信号：连续 ${continuousCount} 根K线高于中轨`);
+  }
+
+  // === 若上述无信号，再检查最近 N 根K线内是否发生金叉或死叉 ===
+  if (!shouldLong && !shouldShort && emaShort.length >= 2 && emaLong.length >= 2) {
+    const crossCheckCount = config.signalValidCandles || 3; // 默认回看最近3根K线
+    const start = Math.max(1, emaShort.length - crossCheckCount); // 避免越界
+
+    for (let i = start; i < emaShort.length; i++) {
+      const prevShort = emaShort[i - 1];
+      const prevLong = emaLong[i - 1];
+      const currShort = emaShort[i];
+      const currLong = emaLong[i];
+
+      if (prevShort < prevLong && currShort > currLong) {
+        shouldLong = true;
+        log(`🟢 最近 ${crossCheckCount} 根内检测到金叉：EMA短期上穿长期 (index=${i})`);
+        break;
+      }
+
+      if (prevShort > prevLong && currShort < currLong) {
+        shouldShort = true;
+        log(`🔴 最近 ${crossCheckCount} 根内检测到死叉：EMA短期下穿长期 (index=${i})`);
+        break;
+      }
     }
 
-    // 判断连续N根K线收盘价是否都在中轨线上方或下方
-    // 连续在中轨线上方 => 做多信号
-    // 连续在中轨线下方 => 做空信号
-    let longCount = 0;
-    let shortCount = 0;
-
-    for (let i = klines.length - continuousCount; i < klines.length; i++) {
-      const close = closes[i];
-      const basis = bb[i - bbStartIndex].middle;
-
-      if (close >= basis) longCount++;
-      if (close <= basis) shortCount++;
-    }
-
-    if (longCount === continuousCount) {
-      shouldLong = true;
-      log(`✅ 连续 ${continuousCount} 根K线收盘价高于布林带中轨，触发做多信号`);
-    } else if (shortCount === continuousCount) {
-      shouldShort = true;
-      log(`✅ 连续 ${continuousCount} 根K线收盘价低于布林带中轨，触发做空信号`);
+    if (!shouldLong && !shouldShort) {
+      log(`ℹ️ 最近 ${crossCheckCount} 根K线内未检测到金叉/死叉`);
     }
   }
 
-  // === 简单评分机制（可拓展） ===
+  // === 综合评分，可扩展 ===
   let score = 0;
   if (shouldLong || shouldShort) score += 1;
 
   return { shouldLong, shouldShort, score };
 }
+
 
 
 module.exports = {
