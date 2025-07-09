@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
-const { getCachedTopSymbols, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
+const { clearSelectedSymbol, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
 const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
 const { selectBestSymbols } = require('../strategy/selector');
@@ -35,7 +35,7 @@ async function sendMainMenu() {
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
-    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }]
+    [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '🧹 清空已选币种', callback_data: 'clear_selected' }]
   ];
 
   try {
@@ -78,11 +78,11 @@ async function handleCommand(data, chatId) {
     sendTelegramMessage('🚀 手动执行策略...');
     await runStrategyCycle();
   } else if (data === 'status') {
-    const selected = getSelectedSymbol();
+    const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
     const statusText = `📊 当前策略状态：
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
-- 选中币种：${selected?.symbol || '无'}
-- 方向：${selected?.symbol ? (selected?.symbol.includes('short') ? '做空' : '做多') : '无'}`;
+- 选中币种：${selectedSymbol || '无'}
+- 方向：${selectedSymbol?.toLowerCase().includes('short') ? '做空' : (selectedSymbol ? '做多' : '无')}`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
@@ -113,6 +113,9 @@ async function handleCommand(data, chatId) {
       // 报错已经在 placeOrder 内部处理，这里可以再打印日志
       console.error(`下单失败: ${symbol}`, err.message);
     }
+  } else if (data === 'clear_selected') {
+    clearSelectedSymbol();
+    sendTelegramMessage('🧹 已清空选中币种缓存');
   }
 }
 

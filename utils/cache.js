@@ -83,10 +83,21 @@ const getSelectedSymbol = () => {
   return symbol || null;
 };
 
+// 清空已选币种缓存文件内容
+const clearSelectedSymbol = () => {
+  if (fs.existsSync(config.cachePaths.selectedSymbol)) {
+    fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({}, null, 2));
+    log('🧹 已清空已选币种缓存文件内容');
+  } else {
+    log('ℹ️ 已选币种缓存文件不存在，无需清空');
+  }
+};
+
 module.exports = {
   cacheTopSymbols,
   getCachedTopSymbols,
   cacheSelectedSymbol,
   getSelectedSymbol,
-  getSymbolPrecision
+  getSymbolPrecision,
+  clearSelectedSymbol
 };
