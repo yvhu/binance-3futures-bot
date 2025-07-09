@@ -178,30 +178,22 @@ async function shouldCloseByExitSignal(symbol, interval) {
   const currentSide = position?.side; // 'BUY' 或 'SELL'
   log(`📌 当前持仓方向: ${currentSide || '无'}`);
 
-  // === 只在存在持仓时执行中轨反向判断 ===
-  const bbStartIndex = bb.length - klines.length;
-  if (bbStartIndex < 0) {
-    log(`⚠️ 布林带结果长度: ${bb.length}`);
-    log(`⚠️ K线长度${klines.length}`);
-    log('⚠️ 布林带结果长度与K线不匹配');
-    // return { shouldLong: false, shouldShort: false, score: 0 };
-  }
-
   let aboveCount = 0;   // 统计连续收盘价高于布林带中轨（basis）的次数
   let belowCount = 0;   // 统计连续收盘价低于布林带中轨（basis）的次数
 
   // 遍历最近 continuousCount 根K线
+  const bbStartOffset = klines.length - bb.length;
   for (let i = klines.length - continuousCount; i < klines.length; i++) {
-    const close = closes[i];                         // 当前K线的收盘价
-    const bbIndex = i - bbStartIndex;
+    const close = closes[i];
+    const bbIndex = i - bbStartOffset;
+
     if (bbIndex < 0 || bbIndex >= bb.length) {
-      continue; // 跳过这根，避免程序崩溃
+      log(`⚠️ bbIndex 越界: ${bbIndex}`);
+      continue;
     }
     const basis = bb[bbIndex].middle;       // 当前K线对应的布林带中轨（需对齐bb数组索引）
-    // const basis = bb[i - bbStartIndex].middle;       // 当前K线对应的布林带中轨（需对齐bb数组索引）
-
-    if (close >= basis) aboveCount++;                // 如果收盘价高于或等于中轨，增加 aboveCount
-    if (close <= basis) belowCount++;                // 如果收盘价低于或等于中轨，增加 belowCount
+    if (close >= basis) aboveCount++;       // 如果收盘价高于或等于中轨，增加 aboveCount
+    if (close <= basis) belowCount++;       // 如果收盘价低于或等于中轨，增加 belowCount
   }
 
 
