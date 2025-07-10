@@ -91,6 +91,8 @@ module.exports = {
     // 新增：币种精度缓存路径
     precision: './cache/precision.json',
     // 新增：持仓记录缓存
-    position: './cache/position.json'
+    position: './cache/position.json',
+    // 仓位比例设置
+    patio: './cache/ratio.json'
   }
 };

@@ -94,11 +94,31 @@ const clearSelectedSymbol = () => {
   }
 };
 
+// 缓存 仓位比例
+function cachePositionRatio(ratio) {
+  const filePath = path.resolve(config.cachePaths.positionRatio || './cache/ratio.json');
+  fs.writeFileSync(filePath, JSON.stringify({ ratio }), 'utf-8');
+}
+
+// 获取仓位比例
+function getCachedPositionRatio() {
+  const filePath = path.resolve(config.cachePaths.positionRatio || './cache/ratio.json');
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return data.ratio;
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = {
   cacheTopSymbols,
   getCachedTopSymbols,
   cacheSelectedSymbol,
   getSelectedSymbol,
   getSymbolPrecision,
-  clearSelectedSymbol
+  clearSelectedSymbol,
+  cachePositionRatio,
+  getCachedPositionRatio
 };

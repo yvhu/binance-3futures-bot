@@ -7,6 +7,7 @@ const { getSymbolPrecision } = require('../utils/cache');
 const { shouldCloseByExitSignal } = require('../indicators/analyzer');
 const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
 const {getCurrentPrice} = require('./market');
+const { getCachedPositionRatio } = require('../utils/cache');
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 
@@ -19,7 +20,10 @@ const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
  */
 async function calcOrderQty(symbol, price) {
   const usdtBalance = await getUSDTBalance();
-  const totalUSDT = usdtBalance * config.positionRatio;
+    // ✅ 使用缓存的 positionRatio，默认 1（100%）
+  const cachedRatio = getCachedPositionRatio();
+  const ratio = cachedRatio !== null ? cachedRatio : config.positionRatio || 1;
+  const totalUSDT = usdtBalance * ratio;
   // 计算原始张数（未处理精度）
   let rawQty = (totalUSDT * config.leverage) / price;
   // === 获取币种精度信息（pricePrecision, quantityPrecision）===

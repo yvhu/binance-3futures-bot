@@ -20,6 +20,8 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 
+const { cachePositionRatio } = require('../utils/cache');
+
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 let serviceStatus = {
@@ -69,6 +71,13 @@ async function sendMainMenu() {
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '🧹 清空已选币种', callback_data: 'clear_selected' }]
   ];
+  const ratioButtons = [
+    { text: '💰 使用25%', callback_data: 'ratio_0.25' },
+    { text: '💰 使用50%', callback_data: 'ratio_0.5' },
+    { text: '💰 使用75%', callback_data: 'ratio_0.75' },
+    { text: '💰 使用100%', callback_data: 'ratio_1' }
+  ];
+  buttons.push(ratioButtons);
 
   try {
     const { longList, shortList } = await selectBestSymbols();
@@ -155,6 +164,14 @@ async function handleCommand(data, chatId) {
   } else if (data === 'clear_selected') {
     clearSelectedSymbol();
     sendTelegramMessage('🧹 已清空选中币种缓存');
+  } else if (data.startsWith('ratio_')) {
+    const ratio = parseFloat(data.split('_')[1]);
+    if (!isNaN(ratio)) {
+      cachePositionRatio(ratio);
+      sendTelegramMessage(`✅ 下单比例已设置为 ${ratio * 100}%`);
+    } else {
+      sendTelegramMessage('❌ 比例设置失败，格式不正确');
+    }
   }
 }
 
