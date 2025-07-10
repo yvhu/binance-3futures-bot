@@ -37,7 +37,8 @@ async function analyzeSymbol(symbol, interval) {
     config.maxRedOrGreenCandles + 5,
     50
   );
-  const klines = await fetchKlines(symbol, interval, limit);
+  // 获取K线数据并排除最后一条可能未完成的
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
 
   if (klines.length < limit) {
     log(`⚠️ 获取K线不足 ${limit} 条，实际只有 ${klines.length}，跳过分析`);
@@ -135,7 +136,8 @@ async function analyzeSymbol(symbol, interval) {
   // === 综合得分机制，可扩展 ===
   let score = 0;
   if (shouldLong || shouldShort) score += 1;
-  if (redCandleHit) score -= 1;
+  if (shouldLong && redCandleHit) score -= 1;
+  if (shouldShort && greenCandleHit) score -= 1;
 
   return { shouldLong, shouldShort, score };
 }
@@ -152,7 +154,9 @@ async function shouldCloseByExitSignal(symbol, interval) {
     50
   );
 
-  const klines = await fetchKlines(symbol, interval, limit);
+  // 获取K线数据并排除最后一条可能未完成的
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+
   if (klines.length < limit) {
     log(`⚠️ 获取K线不足 ${limit} 条，实际只有 ${klines.length} 条，跳过分析`);
     return { shouldLong: false, shouldShort: false, score: -999 };
@@ -239,23 +243,18 @@ async function shouldCloseByExitSignal(symbol, interval) {
   const redGreenCount = config.maxRedOrGreenCandles || 3;
 
   if (!shouldLong && !shouldShort && klines.length >= redGreenCount) {
-    let allRed = true;
-    let allGreen = true;
-
-    for (let i = klines.length - redGreenCount; i < klines.length; i++) {
-      const k = klines[i];
-      if (k.close >= k.open) allRed = false;   // 非红K线
-      if (k.close <= k.open) allGreen = false; // 非绿K线
-    }
+    // 使用工具函数判断连续颜色
+    const isAllRed = countRedCandles(klines, redGreenCount);
+    const isAllGreen = countGreenCandles(klines, redGreenCount);
 
     // 当前持仓做多，且最近N根都是红K（阴线） → 平多做空
-    if (currentSide === 'BUY' && allRed) {
+    if (currentSide === 'BUY' && isAllRed) {
       shouldShort = true;
       log(`🔻 持多 → 检测到连续 ${redGreenCount} 根红K，触发反转做空`);
     }
 
     // 当前持仓做空，且最近N根都是绿K（阳线） → 平空做多
-    if (currentSide === 'SELL' && allGreen) {
+    if (currentSide === 'SELL' && isAllGreen) {
       shouldLong = true;
       log(`🟢 持空 → 检测到连续 ${redGreenCount} 根绿K，触发反转做多`);
     }
