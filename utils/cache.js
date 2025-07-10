@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config/config');
 const { log } = require('./logger');
-
+const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 // 初始化缓存目录
 const ensureCacheDir = () => {
   const dir = path.resolve('./cache');
@@ -12,11 +12,9 @@ const ensureCacheDir = () => {
 // 缓存Top50 + 精度信息
 const cacheTopSymbols = async () => {
   ensureCacheDir();
-  const axios = require('axios');
-
   // 获取币种24小时成交量排序
   const tickerUrl = config.binance.baseUrl + config.binance.endpoints.ticker24hr;
-  const tickerRes = await axios.get(tickerUrl);
+  const tickerRes = await proxyGet(tickerUrl);
 
   const sorted = tickerRes.data
     .filter(item => item.symbol.endsWith('USDT') && !item.symbol.includes('_'))
@@ -28,7 +26,7 @@ const cacheTopSymbols = async () => {
 
   // 获取精度信息（来自 exchangeInfo）
   const exchangeInfoUrl = config.binance.baseUrl + '/fapi/v1/exchangeInfo';
-  const infoRes = await axios.get(exchangeInfoUrl);
+  const infoRes = await proxyGet(exchangeInfoUrl);
   const symbolPrecisions = {};
 
   top50.forEach(symbol => {

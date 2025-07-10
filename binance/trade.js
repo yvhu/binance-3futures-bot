@@ -1,4 +1,4 @@
-const axios = require('axios');
+const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const config = require('../config/config');
 const { sendTelegramMessage } = require('../telegram/messenger');
 const { log } = require('../utils/logger');
@@ -53,7 +53,7 @@ async function getUSDTBalance() {
 
   const url = `${BINANCE_API}/fapi/v2/account?${queryString}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-  const res = await axios.get(url, { headers });
+  const res = await proxyPost(url, { headers });
 
   // 查询USDT资产余额
   const usdtAsset = res.data.assets.find(a => a.asset === 'USDT');
@@ -80,7 +80,7 @@ async function setLeverage(symbol, leverage) {
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
   try {
-    const res = await axios.post(url, null, { headers });
+    const res = await proxyPost(url, null, { headers });
     log(`✅ 设置杠杆成功 ${symbol}：${leverage}x`);
     return res.data;
   } catch (err) {
@@ -123,7 +123,7 @@ async function placeOrder(symbol, side = 'BUY') {
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
   try {
     // 执行下单请求
-    const res = await axios.post(finalUrl, null, { headers });
+    const res = await proxyPost(finalUrl, null, { headers });
     // 持仓数量带方向，买多为正，卖空为负
     const positionAmt = side === 'BUY' ? qty : -qty;
     const entryPrice = price;
@@ -228,7 +228,7 @@ async function closePositionIfNeeded(symbol) {
 
       // 发送下单请求
       try {
-        const res = await axios.post(finalUrl, null, { headers });
+        const res = await proxyPost(finalUrl, null, { headers });
         log(`币安平仓接口响应：`, res.data);
 
         if (res?.status != 200) {

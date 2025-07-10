@@ -20,6 +20,8 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 
+const { HttpsProxyAgent } = require('https-proxy-agent');
+
 let serviceStatus = {
   running: false
 };
@@ -28,7 +30,16 @@ let serviceStatus = {
  * 初始化 Telegram Bot，启动监听，绑定回调事件
  */
 async function initTelegramBot() {
-  const bot = new TelegramBot(config.telegram.token, { polling: true });
+  let botOptions = { polling: true };
+
+  if (config.telegram.useProxy && config.telegram.proxyUrl) {
+    botOptions.request = {
+      agent: new HttpsProxyAgent(config.proxyUrl)
+    };
+    log(`🌐 使用代理启动 Telegram Bot：${config.proxyUrl}`);
+  }
+
+  const bot = new TelegramBot(config.telegram.token, botOptions);
   setBot(bot); // 设置全局 bot 实例，供其他模块获取
 
   log('🤖 Telegram Bot 已启动');

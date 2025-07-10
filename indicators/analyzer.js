@@ -1,6 +1,6 @@
 // 引入技术指标库中的 EMA 与 BollingerBands
 const { EMA, BollingerBands } = require('technicalindicators');
-const axios = require('axios');
+const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { getPosition } = require('../utils/position');
@@ -10,7 +10,7 @@ const { getCurrentPrice } = require('../binance/market');
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
   const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const response = await axios.get(url);
+  const response = await proxyGet(url);
 
   return response.data.map(k => ({
     time: k[0],

@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { log } = require('./logger');
-const axios = require('axios');
+const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const crypto = require('crypto');
 const config = require('../config/config');
 
@@ -71,7 +71,7 @@ async function refreshPositionsFromBinance() {
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
 
   try {
-    const res = await axios.get(url, { headers });
+    const res = await proxyGet(url, { headers });
     const allPositions = res.data;
 
     // 清空旧数据

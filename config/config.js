@@ -2,7 +2,7 @@ require('dotenv').config();
 
 module.exports = {
   // 策略使用的K线周期（如3分钟）
-  interval: '3m',
+  interval: '5m',
 
   // 每次选取做多或做空的币种数量（Top N）
   selectionCount: 5,
@@ -57,7 +57,11 @@ module.exports = {
     // Telegram 机器人 Token（可放入 .env 文件）
     token: process.env.TELEGRAM_TOKEN || 'your-token',
     // 目标聊天的 chatId，可是个人ID或群组ID
-    chatId: process.env.TELEGRAM_CHAT_ID || 'your-chat-id'
+    chatId: process.env.TELEGRAM_CHAT_ID || 'your-chat-id',
+    // 控制是否启用代理
+    useProxy: false,
+    // 本地代理地址（无需认证）
+    proxyUrl: 'http://127.0.0.1:7897'
   },
 
   // 币安接口配置
@@ -71,7 +75,11 @@ module.exports = {
       ticker24hr: '/fapi/v1/ticker/24hr', // 获取24小时行情数据
       price: '/fapi/v1/ticker/price',     // 获取最新市价
       klines: '/fapi/v1/klines'           // 获取K线数据
-    }
+    },
+    // 控制是否启用代理
+    useProxy: false,
+    // 本地代理地址（无需认证）
+    proxyUrl: 'http://127.0.0.1:7897'
   },
 
   // 缓存文件路径配置
