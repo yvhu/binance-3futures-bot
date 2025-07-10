@@ -20,7 +20,7 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 
-const { cachePositionRatio } = require('../utils/cache');
+const { cachePositionRatio, getCachedPositionRatio } = require('../utils/cache');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -117,6 +117,7 @@ async function handleCommand(data, chatId) {
     await runStrategyCycle();
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
+    const cachedRatio = getCachedPositionRatio();
     let directionText = '无';
     if (selectedSymbol) {
       const position = getPosition(selectedSymbol);
@@ -131,7 +132,8 @@ async function handleCommand(data, chatId) {
     const statusText = `📊 当前策略状态：
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
 - 选中币种：${selectedSymbol || '无'}
-- 方向：${directionText}`;
+- 方向：${directionText}
+- 最新下单比例：${cachedRatio * 100}%`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
