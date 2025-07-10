@@ -53,7 +53,7 @@ async function getUSDTBalance() {
 
   const url = `${BINANCE_API}/fapi/v2/account?${queryString}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-  const res = await proxyPost(url, { headers });
+  const res = await proxyGet(url, { headers });
 
   // 查询USDT资产余额
   const usdtAsset = res.data.assets.find(a => a.asset === 'USDT');
