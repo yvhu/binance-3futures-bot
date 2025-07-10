@@ -39,7 +39,7 @@ async function proxyGet(url, headersOrWrapped = {}) {
 async function proxyPost(url, data = {}, headersOrWrapped = {}) {
   const headers = normalizeHeaders(headersOrWrapped);
   const instance = createProxyAxios();
-  return instance.post(url, null, { headers });
+  return instance.post(url, data, { headers });
 }
 
 /**
