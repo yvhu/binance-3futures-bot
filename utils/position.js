@@ -85,8 +85,9 @@ async function refreshPositionsFromBinance() {
       const side = amt > 0 ? 'BUY' : 'SELL';
       const time = Date.now();
       const positionAmt = amt;
+      const entryPrice = parseFloat(pos.entryPrice);;
 
-      setPosition(symbol, { time, side, positionAmt });
+      setPosition(symbol, { time, side, positionAmt, entryPrice });
     }
 
     log(`✅ 已从币安刷新持仓，共 ${allPositions.filter(p => parseFloat(p.positionAmt) !== 0).length} 个币种`);

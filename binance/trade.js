@@ -6,20 +6,9 @@ const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
 const { shouldCloseByExitSignal } = require('../indicators/analyzer');
 const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
-
+const {getCurrentPrice} = require('./market');
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
-
-/**
- * 获取币种当前市场价格（USDT合约）
- * @param {string} symbol 交易对，如 BTCUSDT
- * @returns {number} 当前最新成交价
- */
-async function getCurrentPrice(symbol) {
-  const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
-  const res = await axios.get(url);
-  return parseFloat(res.data.price);
-}
 
 /**
  * 计算可下单数量（合约张数）
@@ -137,11 +126,13 @@ async function placeOrder(symbol, side = 'BUY') {
     const res = await axios.post(finalUrl, null, { headers });
     // 持仓数量带方向，买多为正，卖空为负
     const positionAmt = side === 'BUY' ? qty : -qty;
+    const entryPrice = price;
     // 记录持仓方向和时间
     setPosition(symbol, {
       time: Date.now(),
       side,
-      positionAmt  // 记录持仓数量
+      positionAmt,  // 记录持仓数量
+      entryPrice,
     });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
@@ -268,6 +259,5 @@ async function closePositionIfNeeded(symbol) {
 
 module.exports = {
   placeOrder,
-  closePositionIfNeeded,
-  getCurrentPrice
+  closePositionIfNeeded
 };

@@ -5,6 +5,7 @@ const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { getPosition } = require('../utils/position');
 const { countRedCandles, countGreenCandles } = require('../utils/filters')
+const { getCurrentPrice } = require('../binance/market');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -182,6 +183,38 @@ async function shouldCloseByExitSignal(symbol, interval) {
   const currentSide = position?.side; // 'BUY' 或 'SELL'
   log(`📌 当前持仓方向: ${currentSide || '无'}`);
 
+  // === 浮动盈亏判断（当前收益率超限则立即触发平仓） ===
+  if (position && currentSide && position.entryPrice > 0) {
+    const entryPrice = parseFloat(position.entryPrice);
+    const currentPrice = await getCurrentPrice(symbol);
+    let pnlRate;
+
+    if (currentSide === 'BUY') {
+      pnlRate = (currentPrice - entryPrice) / entryPrice;
+    } else if (currentSide === 'SELL') {
+      pnlRate = (entryPrice - currentPrice) / entryPrice;
+    }
+
+    const leverage = config.leverage || 1;
+    const effectivePnl = pnlRate * leverage;
+
+    log(`📊 当前浮动收益率: ${(pnlRate * 100).toFixed(2)}%`);
+
+    if (effectivePnl >= config.profitThreshold) {
+      shouldLong = false;
+      shouldShort = currentSide === 'BUY';  // 平多
+      shouldLong = currentSide === 'SELL';  // 平空
+      log(`✅ 杠杆后盈利超过 ${(config.profitThreshold * 100)}%，触发平仓`);
+    }
+
+    if (effectivePnl <= config.lossThreshold) {
+      shouldLong = false;
+      shouldShort = currentSide === 'BUY';  // 平多
+      shouldLong = currentSide === 'SELL';  // 平空
+      log(`⚠️ 杠杆后亏损超过 ${(config.lossThreshold * 100)}%，触发止损平仓`);
+    }
+  }
+
   let aboveCount = 0;   // 统计连续收盘价高于布林带中轨（basis）的次数
   let belowCount = 0;   // 统计连续收盘价低于布林带中轨（basis）的次数
 
@@ -199,7 +232,6 @@ async function shouldCloseByExitSignal(symbol, interval) {
     if (close >= basis) aboveCount++;       // 如果收盘价高于或等于中轨，增加 aboveCount
     if (close <= basis) belowCount++;       // 如果收盘价低于或等于中轨，增加 belowCount
   }
-
 
   // === 持仓是做多：连续收盘在中轨下方 → 平多做空
   if (currentSide === 'BUY' && belowCount === continuousCount) {

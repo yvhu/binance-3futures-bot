@@ -46,6 +46,12 @@ module.exports = {
   // 最大持仓时间（单位：分钟，超过后强制平仓）
   maxPositionMinutes: 180,
 
+  // 盈利超过 100% 平仓
+  profitThreshold: 1,
+
+  // 亏损超过 -50% 平仓
+  lossThreshold: -0.5,
+
   // Telegram 配置
   telegram: {
     // Telegram 机器人 Token（可放入 .env 文件）

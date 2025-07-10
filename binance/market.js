@@ -1,15 +1,15 @@
 const axios = require('axios');
 const config = require('../config/config');
-
+const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 // ✅ 获取24小时成交量（已集成 cache.js 中，不重复）
 async function getTopSymbols() {
-  const response = await axios.get(`${config.binance.baseUrl}${config.binance.endpoints.ticker24hr}`);
+  const response = await axios.get(`${BINANCE_API}${config.binance.endpoints.ticker24hr}`);
   return response.data;
 }
 
 // ✅ 获取 K 线数据（用于指标分析）
 async function getKlines(symbol, interval = '3m', limit = 50) {
-  const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const url = `${BINANCE_API}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const response = await axios.get(url);
   return response.data.map(k => ({
     openTime: k[0],
@@ -21,7 +21,19 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
   }));
 }
 
+/**
+ * 获取币种当前市场价格（USDT合约）
+ * @param {string} symbol 交易对，如 BTCUSDT
+ * @returns {number} 当前最新成交价
+ */
+async function getCurrentPrice(symbol) {
+  const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
+  const res = await axios.get(url);
+  return parseFloat(res.data.price);
+}
+
 module.exports = {
   getTopSymbols,
-  getKlines
+  getKlines,
+  getCurrentPrice
 };
