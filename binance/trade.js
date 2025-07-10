@@ -215,15 +215,6 @@ async function closePositionIfNeeded(symbol) {
     log(`开始自动平仓`);
     try {
       const timestamp = Date.now();
-      // 获取该交易对的数量精度，用于下单数量四舍五入
-      // const precision = getSymbolPrecision(symbol);
-      // if (!precision) throw new Error(`未找到 ${symbol} 精度信息`);
-
-      // 计算下单数量（注意应根据仓位大小和价格计算）
-      // const qtyRaw = await calcOrderQty(symbol, price);
-      // 保留数量精度（数量是浮点数）
-      // const qty = parseFloat(qtyRaw.toFixed(precision.quantityPrecision));
-
       // 构造币安合约下单请求参数（市价单）
       const data = new URLSearchParams({
         symbol,
@@ -249,11 +240,11 @@ async function closePositionIfNeeded(symbol) {
         const res = await axios.post(finalUrl, null, { headers });
         log(`币安平仓接口响应：`, res.data);
 
-        // if (!res.data) {
-        //   log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
-        //   sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
-        //   return;  // 不清理本地持仓，等待后续成交或人工处理
-        // }
+        if (res?.status != 200) {
+          log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
+          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
+          return;  // 不清理本地持仓，等待后续成交或人工处理
+        }
 
         // 订单成交成功
         removePosition(symbol);
