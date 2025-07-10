@@ -7,9 +7,9 @@ const config = require('../config/config');
  */
 function createProxyAxios() {
   const options = {};
-  if (config.binance.useProxy && config.binance.proxyUrl) {
-    options.httpsAgent = new HttpsProxyAgent(config.binance.proxyUrl);
-  }
+//   if (config.binance.useProxy && config.binance.proxyUrl) {
+//     options.httpsAgent = new HttpsProxyAgent(config.binance.proxyUrl);
+//   }
   return axios.create(options);
 }
 
