@@ -135,7 +135,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     if (lastClose < lastBoll.lower) score += 1;
     if (lastEma13 - lastEma5 > 0.1) score += 1;
   }
-
+  log(`✅ ${symbol}: side: ${side}, signal: ${signal}, score: ${score}`);
   if (!signal || score === 0) return null;
 
   return { symbol, side: signal, score };
@@ -148,6 +148,7 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
 
   for (const symbol of symbolList) {
     try {
+      log(`✅ ${symbol} 开始校验:`);
       const res = await evaluateSymbolWithScore(symbol);
       if (!res) continue;
       if (res.side === 'LONG') longList.push(res);
