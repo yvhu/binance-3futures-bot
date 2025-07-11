@@ -84,57 +84,73 @@ async function selectSymbolFromList(symbolList) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  const klines = await getKlines(symbol, interval, 100);
-  if (!klines || klines.length < 30) return null;
+  const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
+  if (!klines || klines.length < 50) return null;
 
   const close = klines.map(k => parseFloat(k[4]));
   const high = klines.map(k => parseFloat(k[2]));
   const low = klines.map(k => parseFloat(k[3]));
   const volume = klines.map(k => parseFloat(k[5]));
 
-  // ================== 横盘过滤 ==================
+  // ========== 横盘震荡过滤 ==========
   const flat = isFlatMarket({ close, high, low }, 0.005, 0.01); // 参数可调
   if (flat) {
     log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
   }
 
-  const lastClose = close[close.length - 1];
+  // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
   const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
   const vwap = getVWAP(close, high, low, volume);
 
-  const lastVWAP = vwap[vwap.length - 1];
-  const lastEma5 = ema5[ema5.length - 1];
-  const lastEma13 = ema13[ema13.length - 1];
-  const lastBoll = boll[boll.length - 1];
-  const prevBoll = boll[boll.length - 2];
+  // 对齐所有指标长度
+  const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length);
+  if (minLength < 2) {
+    log(`⚠️ ${symbol} 指标长度不足，跳过`);
+    return null;
+  }
 
-  const prevClose = close[close.length - 2];
+  const offset = close.length - minLength;
+  const alignedClose = close.slice(offset);
+  const alignedEma5 = ema5.slice(-minLength);
+  const alignedEma13 = ema13.slice(-minLength);
+  const alignedVWAP = vwap.slice(-minLength);
+  const alignedBoll = boll.slice(-minLength);
 
+  // 使用最后一根作为判断依据
+  const lastClose = alignedClose[minLength - 1];
+  const prevClose = alignedClose[minLength - 2];
+
+  const lastEma5 = alignedEma5[minLength - 1];
+  const lastEma13 = alignedEma13[minLength - 1];
+
+  const lastVWAP = alignedVWAP[minLength - 1];
+
+  const lastBoll = alignedBoll[minLength - 1];
+  const prevBoll = alignedBoll[minLength - 2];
+
+  // ========== 打分逻辑 ==========
   let longScore = 0;
   let shortScore = 0;
 
-  // ===== 多头打分 =====
-  if (lastClose > lastVWAP) longScore += 1;
-  if (lastEma5 > lastEma13) longScore += 1;
-  if (lastClose > lastBoll.middle) longScore += 1;
-  if (lastClose > lastBoll.upper) longScore += 1;
-  if (lastEma5 - lastEma13 > 0.05) longScore += 1;
+  if (lastClose > lastVWAP) longScore++;
+  if (lastEma5 > lastEma13) longScore++;
+  if (lastClose > lastBoll.middle) longScore++;
+  if (lastClose > lastBoll.upper) longScore++;
+  if (lastEma5 - lastEma13 > 0.05) longScore++;
 
-  // ===== 空头打分 =====
-  if (lastClose < lastVWAP) shortScore += 1;
-  if (lastEma5 < lastEma13) shortScore += 1;
-  if (lastClose < lastBoll.middle) shortScore += 1;
-  if (lastClose < lastBoll.lower) shortScore += 1;
-  if (lastEma13 - lastEma5 > 0.05) shortScore += 1;
+  if (lastClose < lastVWAP) shortScore++;
+  if (lastEma5 < lastEma13) shortScore++;
+  if (lastClose < lastBoll.middle) shortScore++;
+  if (lastClose < lastBoll.lower) shortScore++;
+  if (lastEma13 - lastEma5 > 0.05) shortScore++;
 
+  // ========== 最终信号选择 ==========
+  const threshold = 3;
   let signal = null;
   let score = 0;
-
-  // ===== 设置最低打分要求 =====
-  const threshold = 3;
 
   if (longScore >= threshold && longScore >= shortScore) {
     signal = 'LONG';
@@ -145,7 +161,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   }
 
   log(`✅ ${symbol}: side=${signal}, longScore=${longScore}, shortScore=${shortScore}`);
-  log(`${symbol} → close=${lastClose.toFixed(3)}, ema5=${lastEma5.toFixed(3)}, ema13=${lastEma13.toFixed(3)}, vwap=${lastVWAP.toFixed(3)}`);
+  log(`${symbol} → close=${lastClose.toFixed(4)}, ema5=${lastEma5.toFixed(4)}, ema13=${lastEma13.toFixed(4)}, vwap=${lastVWAP.toFixed(4)}`);
 
   if (!signal) return null;
   return { symbol, side: signal, score };
