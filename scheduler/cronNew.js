@@ -1,14 +1,15 @@
 const cron = require('node-cron');
-const { selectSymbolFromList } = require('../strategy/selectorRun');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
-const { getTopSymbols } = require('../binance/market')
+const { getCachedTopSymbols } = require('../utils/cache');
+const { getTopLongShortSymbols } = require('../strategy/selectorRun');
 
 async function startSchedulerNew() {
   cron.schedule('*/3 * * * *', async () => {
     if (serviceStatus.running) {
       log('⏱ 执行定时策略轮询...');
-      const topSymbols = await getTopSymbols(); // 从缓存中加载Top50
+      // const topSymbols = await getTopSymbols(); // 从缓存中加载Top50
+      const topSymbols = getCachedTopSymbols();
       const { topLong, topShort } = await getTopLongShortSymbols(topSymbols, 1); // 获取前3多空币种
       for (const long of topLong) {
         // await openPosition(long.symbol, 'LONG', config.positionRatio);
