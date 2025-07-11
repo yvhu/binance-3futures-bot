@@ -30,10 +30,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   if (!klines || klines.length < 50) return null;
 
-  const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
-  const high = klines.map(k => parseFloat(k[2])).filter(x => !isNaN(x));
-  const low = klines.map(k => parseFloat(k[3])).filter(x => !isNaN(x));
-  const volume = klines.map(k => parseFloat(k[5])).filter(x => !isNaN(x));
+  // const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
+  const close = klines.map(k => k.close);
+  const high = klines.map(k => k.high);
+  const low = klines.map(k => k.low);
+  const volume = klines.map(k => k.volume);
 
 
   // ========== 横盘震荡过滤 ==========
