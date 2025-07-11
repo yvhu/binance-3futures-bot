@@ -3,14 +3,31 @@
 
 const { EMA, BollingerBands } = require('technicalindicators');
 const { getVWAP } = require('../utils/vwap'); // VWAP计算函数
-const { getKlines } = require('../binance/market'); // 获取币种K线
+// const { getKlines } = require('../binance/market'); // 获取币种K线
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { isFlatMarket } = require('../utils/flatFilter');
+const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
+
+// 获取指定币种的 K 线数据（默认获取 50 根）
+async function fetchKlines(symbol, interval, limit = 50) {
+  const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const response = await proxyGet(url);
+
+  return response.data.map(k => ({
+    time: k[0],
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5])
+  }));
+}
 
 // 判断单个币种是否满足做多或做空条件
 async function evaluateSymbol(symbol, interval = '3m') {
-  const klines = await getKlines(symbol, interval, 50);
+  // const klines = await getKlines(symbol, interval, 50);
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
   if (!klines || klines.length < 30) return null;
 
   const close = klines.map(k => parseFloat(k[4])); // 收盘价
@@ -84,7 +101,8 @@ async function selectSymbolFromList(symbolList) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
+  // const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
   if (!klines || klines.length < 50) return null;
 
   const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
