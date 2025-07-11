@@ -1,6 +1,7 @@
 // index.js - 启动主入口
 const { initTelegramBot } = require('./telegram/bot');
 const { startScheduler } = require('./scheduler/cron');
+const { startSchedulerNew } = require('./scheduler/cronNew');
 const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
@@ -15,7 +16,8 @@ process.on('unhandledRejection', (reason, promise) => {
     log('Telegram Token:', config.telegram.token);
     await initTelegramBot();          // 初始化 TG 按钮控制
     await cacheTopSymbols();          // 启动时获取Top50币种
-    await startScheduler();           // 定时策略
+    // await startScheduler();           // 定时策略
+    await startSchedulerNew();
   } catch (error) {
     console.error('❌ 启动失败:', error.message);
   }
