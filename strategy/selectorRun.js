@@ -87,10 +87,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
   if (!klines || klines.length < 50) return null;
 
-  const close = klines.map(k => parseFloat(k[4]));
-  const high = klines.map(k => parseFloat(k[2]));
-  const low = klines.map(k => parseFloat(k[3]));
-  const volume = klines.map(k => parseFloat(k[5]));
+  const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
+  const high = klines.map(k => parseFloat(k[2])).filter(x => !isNaN(x));
+  const low = klines.map(k => parseFloat(k[3])).filter(x => !isNaN(x));
+  const volume = klines.map(k => parseFloat(k[5])).filter(x => !isNaN(x));
+
 
   // ========== 横盘震荡过滤 ==========
   const flat = isFlatMarket({ close, high, low }, 0.005, 0.01); // 参数可调
@@ -102,15 +103,20 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
-  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
+  const boll = BollingerBands.calculate({ period: 20, values: close });
   const vwap = getVWAP(close, high, low, volume);
+
+  log(`${symbol} → ema5=${ema5.length}, ema13=${ema13.length}, boll=${boll.length}, vwap=${vwap.length}`);
+
 
   // 对齐所有指标长度
   const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length);
-  if (minLength < 2) {
-    log(`⚠️ ${symbol} 指标长度不足，跳过`);
+
+  if (ema5.length < 1 || ema13.length < 1 || boll.length < 2 || vwap.length < 1) {
+    log(`❌ ${symbol} 指标长度不足: ema5=${ema5.length}, ema13=${ema13.length}, boll=${boll.length}, vwap=${vwap.length}`);
     return null;
   }
+
 
   const offset = close.length - minLength;
   const alignedClose = close.slice(offset);
