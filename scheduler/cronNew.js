@@ -16,14 +16,14 @@ async function startSchedulerNew() {
       for (const long of topLong) {
         // await openPosition(long.symbol, 'LONG', config.positionRatio);
         log(`✅ 开始下单`);
-        await placeOrder(symbol, 'BUY'); // 策略运行时才下单
+        await placeOrder(long.symbol, 'BUY'); // 策略运行时才下单
         log(`✅ 做多 ${long.symbol}，信号分数 ${long.score}`);
       }
 
       for (const short of topShort) {
         // await openPosition(short.symbol, 'SHORT', config.positionRatio);
         log(`✅ 开始下单`);
-        await placeOrder(symbol, 'SELL'); // 策略运行时才下单
+        await placeOrder(long.symbol, 'SELL'); // 策略运行时才下单
         log(`✅ 做空 ${short.symbol}，信号分数 ${short.score}`);
       }
     }
