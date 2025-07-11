@@ -6,6 +6,7 @@ const { getVWAP } = require('../utils/vwap'); // VWAP计算函数
 const { getKlines } = require('../binance/market'); // 获取币种K线
 const config = require('../config/config');
 const { log } = require('../utils/logger');
+const { isFlatMarket } = require('../utils/flatFilter');
 
 // 判断单个币种是否满足做多或做空条件
 async function evaluateSymbol(symbol, interval = '3m') {
@@ -83,13 +84,20 @@ async function selectSymbolFromList(symbolList) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  const klines = await getKlines(symbol, interval, 50);
+  const klines = await getKlines(symbol, interval, 100);
   if (!klines || klines.length < 30) return null;
 
   const close = klines.map(k => parseFloat(k[4]));
   const high = klines.map(k => parseFloat(k[2]));
   const low = klines.map(k => parseFloat(k[3]));
   const volume = klines.map(k => parseFloat(k[5]));
+
+  // ================== 横盘过滤 ==================
+  const flat = isFlatMarket({ close, high, low }, 0.005, 0.01); // 参数可调
+  if (flat) {
+    log(`🚫 ${symbol} 横盘震荡过滤`);
+    return null;
+  }
 
   const lastClose = close[close.length - 1];
   const ema5 = EMA.calculate({ period: 5, values: close });
