@@ -101,43 +101,45 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const lastEma5 = ema5[ema5.length - 1];
   const lastEma13 = ema13[ema13.length - 1];
   const lastBoll = boll[boll.length - 1];
+  const prevBoll = boll[boll.length - 2];
 
   const prevClose = close[close.length - 2];
-  const prevBollMiddle = boll[boll.length - 2]?.middle;
+
+  let longScore = 0;
+  let shortScore = 0;
+
+  // ===== 多头打分 =====
+  if (lastClose > lastVWAP) longScore += 1;
+  if (lastEma5 > lastEma13) longScore += 1;
+  if (lastClose > lastBoll.middle) longScore += 1;
+  if (lastClose > lastBoll.upper) longScore += 1;
+  if (lastEma5 - lastEma13 > 0.05) longScore += 1;
+
+  // ===== 空头打分 =====
+  if (lastClose < lastVWAP) shortScore += 1;
+  if (lastEma5 < lastEma13) shortScore += 1;
+  if (lastClose < lastBoll.middle) shortScore += 1;
+  if (lastClose < lastBoll.lower) shortScore += 1;
+  if (lastEma13 - lastEma5 > 0.05) shortScore += 1;
 
   let signal = null;
   let score = 0;
 
-  // ============ 多头打分 ============
-  if (
-    lastClose > lastVWAP &&
-    lastEma5 > lastEma13 &&
-    prevClose < prevBollMiddle &&
-    lastClose > lastBoll.middle
-  ) {
+  // ===== 设置最低打分要求 =====
+  const threshold = 3;
+
+  if (longScore >= threshold && longScore >= shortScore) {
     signal = 'LONG';
-    score += 1;
-    if (lastClose > lastEma5) score += 1;
-    if (lastClose > lastBoll.upper) score += 1; // 强势突破上轨
-    if (lastEma5 - lastEma13 > 0.1) score += 1;  // EMA角度大
-  }
-
-  // ============ 空头打分 ============
-  if (
-    lastClose < lastVWAP &&
-    lastEma5 < lastEma13 &&
-    prevClose > prevBollMiddle &&
-    lastClose < lastBoll.middle
-  ) {
+    score = longScore;
+  } else if (shortScore >= threshold) {
     signal = 'SHORT';
-    score += 1;
-    if (lastClose < lastEma5) score += 1;
-    if (lastClose < lastBoll.lower) score += 1;
-    if (lastEma13 - lastEma5 > 0.1) score += 1;
+    score = shortScore;
   }
-  log(`✅ ${symbol}: side: ${signal}, score: ${score}`);
-  if (!signal || score === 0) return null;
 
+  log(`✅ ${symbol}: side=${signal}, longScore=${longScore}, shortScore=${shortScore}`);
+  log(`${symbol} → close=${lastClose.toFixed(3)}, ema5=${lastEma5.toFixed(3)}, ema13=${lastEma13.toFixed(3)}, vwap=${lastVWAP.toFixed(3)}`);
+
+  if (!signal) return null;
   return { symbol, side: signal, score };
 }
 
