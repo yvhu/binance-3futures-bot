@@ -27,7 +27,7 @@ async function fetchKlines(symbol, interval, limit = 50) {
 // 判断单个币种是否满足做多或做空条件
 async function evaluateSymbol(symbol, interval = '3m') {
   // const klines = await getKlines(symbol, interval, 50);
-  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+  const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   if (!klines || klines.length < 30) return null;
 
   const close = klines.map(k => parseFloat(k[4])); // 收盘价
@@ -102,7 +102,7 @@ async function selectSymbolFromList(symbolList) {
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
-  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+  const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   if (!klines || klines.length < 50) return null;
 
   const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
