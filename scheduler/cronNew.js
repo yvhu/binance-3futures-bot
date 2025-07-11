@@ -12,7 +12,7 @@ async function startSchedulerNew() {
       const topSymbols = getCachedTopSymbols();
       log(`✅ 获取T50缓存数据`);
       const { topLong, topShort } = await getTopLongShortSymbols(topSymbols, 1); // 获取前3多空币种
-      log(`✅ 获取前1多空币种`);
+      log(`✅ 获取前1多${topLong.symbol},空${topShort.symbol}币种`);
       for (const long of topLong) {
         // await openPosition(long.symbol, 'LONG', config.positionRatio);
         log(`✅ 开始下单`);
