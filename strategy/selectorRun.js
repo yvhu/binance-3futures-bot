@@ -159,7 +159,8 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
 
   const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
   const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
-
+  log(`Top Longs: ${JSON.stringify(topLong, null, 2)}`);
+  log(`Top Shorts: ${JSON.stringify(topShort, null, 2)}`);
   return { topLong, topShort };
 }
 
