@@ -3,13 +3,13 @@
 
 const { EMA, BollingerBands } = require('technicalindicators');
 const { getVWAP } = require('../utils/vwap'); // VWAP计算函数
-const { fetchKlines } = require('../binance/market'); // 获取币种K线
+const { getKlines } = require('../binance/market'); // 获取币种K线
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 
 // 判断单个币种是否满足做多或做空条件
 async function evaluateSymbol(symbol, interval = '3m') {
-  const klines = await fetchKlines(symbol, interval, 50);
+  const klines = await getKlines(symbol, interval, 50);
   if (!klines || klines.length < 30) return null;
 
   const close = klines.map(k => parseFloat(k[4])); // 收盘价
@@ -83,7 +83,7 @@ async function selectSymbolFromList(symbolList) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  const klines = await fetchKlines(symbol, interval, 50);
+  const klines = await getKlines(symbol, interval, 50);
   if (!klines || klines.length < 30) return null;
 
   const close = klines.map(k => parseFloat(k[4]));
