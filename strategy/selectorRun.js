@@ -43,8 +43,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
   }
-  log(`🚫 ${symbol} klines长度： ${klines.length}`);
-  log(`❌ ${symbol} 指标值: close=${close}, high=${high}, low=${low}, volume=${volume}`);
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
