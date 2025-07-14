@@ -124,10 +124,10 @@ async function setLeverage(symbol, leverage) {
  * @param {string} symbol 交易对，例如 BTCUSDT
  * @param {string} side 买入BUY 或 卖出SELL
  */
-async function placeOrder(symbol, side = 'BUY') {
+async function placeOrder(symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol);
   await setLeverage(symbol, config.leverage); // 👈 仅首次设置有效，重复设置也没影响
-  const qtyRaw = await calcOrderQty(symbol, price);
+  const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
   // === 获取币种精度并格式化数量 ===
   const precision = getSymbolPrecision(symbol);
   if (!precision) {
