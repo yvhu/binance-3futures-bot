@@ -100,6 +100,7 @@ module.exports = {
   getPosition,
   setPosition,
   removePosition,
+  readAllPositions,
   hasPosition,
   refreshPositionsFromBinance
 };

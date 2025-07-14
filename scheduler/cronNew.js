@@ -4,10 +4,21 @@ const { serviceStatus } = require('../telegram/bot');
 const { getCachedTopSymbols } = require('../utils/cache');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
 const { placeOrder } = require('../binance/trade');
+const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 
 async function startSchedulerNew() {
   cron.schedule('*/3 * * * *', async () => {
     if (serviceStatus.running) {
+      /**
+       * 做出如下调整
+       * 1. 下单数量，单笔10U 可配置BOT。
+       * 2. 每次下单前先检查持仓情况
+       *  2.1 如果当前收益率为负，卖出
+       *  2.2 如果当前收益率为正，观察前一个收盘价是否跌破EMA(21),前一个收盘价在BOLL中轨上方
+       */
+      // 检查是否平仓
+      await checkAndCloseLosingPositions()
+
       log('⏱ 执行定时策略轮询...');
       const topSymbols = getCachedTopSymbols();
       log(`✅ 获取T50缓存数据`);
