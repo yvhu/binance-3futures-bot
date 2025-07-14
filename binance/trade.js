@@ -8,6 +8,7 @@ const { shouldCloseByExitSignal } = require('../indicators/analyzer');
 const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
 const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
+const { getOrderMode } = require('../utils/state');
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 
@@ -19,7 +20,7 @@ const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
  * @returns {number} 可下单数量（处理过精度），不足最小值返回 0
  */
 async function calcOrderQty(symbol, price) {
-  const mode = config.orderMode || 'ratio'; // 默认为比例模式
+  const mode = getOrderMode(); // 默认为比例模式
   const leverage = config.leverage || 10;
 
   let usdtBalance = await getUSDTBalance(); // 当前总余额

@@ -21,6 +21,7 @@ const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils/strategy');
 const { cachePositionRatio, getCachedPositionRatio } = require('../utils/cache');
+const { setOrderMode, getOrderMode } = require('../utils/cache');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -76,6 +77,7 @@ async function sendMainMenu() {
 
   const strategyType = getStrategyType();
   const strategyList = getAllStrategies();
+  const orderMode = getOrderMode(); // 读取当前模式
 
   const buttons = strategyType !== 'ema_boll' ? [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
@@ -94,10 +96,21 @@ async function sendMainMenu() {
     { text: '💰 使用75%', callback_data: 'ratio_0.75' },
     { text: '💰 使用100%', callback_data: 'ratio_1' }
   ];
+
   if (strategyType == 'ema_boll') {
     log(`⚠️ 策略类型是： ${strategyType}, 不填加 持仓数量按钮`);
   } else {
     buttons.push(ratioButtons);
+  }
+
+  if (strategyType == 'ema_boll') {
+    const modeButtons = [
+      { text: `📊 按比例下单 ${orderMode === 'ratio' ? '✅' : ''}`, callback_data: 'order_mode_ratio' },
+      { text: `💵 固定金额下单 ${orderMode === 'amount' ? '✅' : ''}`, callback_data: 'order_mode_amount' }
+    ];
+    buttons.push(modeButtons);
+  } else {
+    log(`⚠️ 策略类型是： ${strategyType}, 不填加 持仓数量按钮`);
   }
 
   const strategyButtons = strategyList.map(s => {
@@ -150,6 +163,7 @@ async function handleCommand(data, chatId) {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
     const cachedRatio = getCachedPositionRatio();
     const strategyType = getStrategyType();
+    const orderMode = getOrderMode(); // 读取当前模式
     let directionText = '无';
     if (selectedSymbol) {
       const position = getPosition(selectedSymbol);
@@ -171,6 +185,7 @@ async function handleCommand(data, chatId) {
         `- 最新下单比例：${cachedRatio * 100}%`
       ] : []),
       `- 策略类型：${strategyType}`,
+      `-下单状态：${orderMode === 'ratio' ? '按比例下单' : '固定金额下单'}`
     ];
 
     const statusText = lines.join('\n');
@@ -224,6 +239,15 @@ async function handleCommand(data, chatId) {
     } else {
       sendTelegramMessage('❌ 未找到该策略类型');
     }
+  } else if (data === 'order_mode_ratio') {
+    setOrderMode('ratio');
+    sendTelegramMessage('📊 已切换为按比例下单模式');
+    await sendMainMenu(); // 刷新按钮状态
+
+  } else if (data === 'order_mode_amount') {
+    setOrderMode('amount');
+    sendTelegramMessage('💵 已切换为固定金额下单模式');
+    await sendMainMenu(); // 刷新按钮状态
   }
 }
 
