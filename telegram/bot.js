@@ -51,6 +51,15 @@ async function initTelegramBot() {
     const chatId = query.message.chat.id;
     await handleCommand(data, chatId);
   });
+  
+  bot.onText(/\/button/, async (msg) => {
+    const chatId = msg.chat.id;
+    if (chatId.toString() === config.telegram.chatId.toString()) {
+      await sendMainMenu();
+    } else {
+      log(`⚠️ 未授权用户尝试使用 /button：${chatId}`);
+    }
+  });
 
   await sendMainMenu();
 }
@@ -109,10 +118,6 @@ async function handleCommand(data, chatId) {
   if (data === 'start') {
     serviceStatus.running = true;
     sendTelegramMessage('✅ 策略已启动');
-  } else if (data === 'button') {
-    log(`命令进入当前位置：${data}`);
-    await sendMainMenu(); // 单独发送面板
-    sendTelegramMessage('🔄 面板信息已更新');
   } else if (data === 'stop') {
     serviceStatus.running = false;
     sendTelegramMessage('⏸ 策略已暂停');
