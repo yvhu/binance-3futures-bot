@@ -28,74 +28,76 @@ async function fetchKlines(symbol, interval, limit = 50) {
  * - 若当前收益为正，则判断是否跌破 EMA21，或前一K线在 BOLL 中轨下方，满足条件保留，否则止盈
  */
 async function checkAndCloseLosingPositions() {
-  const allPositions = readAllPositions(); // 从本地缓存读取所有持仓记录
+  const allPositions = readAllPositions(); // 读取本地缓存的持仓记录
 
   for (const symbol in allPositions) {
     try {
-      const pos = allPositions[symbol]; // 单个币种持仓记录 { entryPrice, side, positionAmt, time }
+      const pos = allPositions[symbol]; // 持仓信息：{ entryPrice, side, positionAmt, time }
 
-      // 获取该币种的 3 分钟周期的最近 100 根K线
       const klines = await fetchKlines(symbol, '3m', 100);
-      if (!klines || klines.length < 30) continue; // 若数据不足则跳过
+      if (!klines || klines.length < 30) continue;
 
-      // 提取收盘价序列
       const closePrices = klines.map(k => k.close);
-
-      // 计算 EMA21 和 BollingerBands(20)
       const ema21 = EMA.calculate({ period: 21, values: closePrices });
       const boll = BollingerBands.calculate({ period: 20, values: closePrices });
-
-      // 确保指标数据足够用于判断
       if (ema21.length < 2 || boll.length < 2) continue;
 
-      // 获取前一根 K线的收盘价
-      const lastKline = klines[klines.length - 2];
+      const lastKline = klines[klines.length - 2]; // 倒数第二根K线
       const prevClose = lastKline.close;
-
-      // 获取前一根 EMA 和 BOLL 中轨数据
       const prevEMA = ema21[ema21.length - 2];
       const prevBOLL = boll[boll.length - 2];
+      const bollMiddle = prevBOLL.middle;
 
-      // 获取持仓基础信息
       const entryPrice = pos.entryPrice;
       const positionAmt = pos.positionAmt;
-      const isLong = pos.side === 'BUY'; // 做多为 BUY，做空为 SELL
+      const entryTime = pos.time;
+      const isLong = pos.side === 'BUY';
 
-      // 当前价格用最新一根 K线收盘价
       const currentPrice = closePrices[closePrices.length - 1];
 
-      // 计算收益率（正为盈利，负为亏损）
       const pnlRate = isLong
         ? (currentPrice - entryPrice) / entryPrice
         : (entryPrice - currentPrice) / entryPrice;
 
       log(`${symbol} 当前收益率：${(pnlRate * 100).toFixed(2)}%`);
 
-      let shouldClose = false; // 是否应平仓
+      let shouldClose = false;
+      let reason = '';
 
-      // 若当前持仓处于亏损状态 → 直接止损
+      // === 条件①：亏损则止损 ===
       if (pnlRate < 0) {
         shouldClose = true;
+        reason = '止损';
         log(`🔻 ${symbol} 亏损止损触发`);
-      } else {
-        // 若盈利，则判断是否破位
-        const bollMiddle = prevBOLL.middle;
-        // 条件：前一K线收盘价 < EMA21 或 < BOLL中轨，才认为趋势完好可继续持有
-        if (prevClose < prevEMA || prevClose < bollMiddle) {
-          log(`🔸 ${symbol} 盈利但破位，触发止盈`);
-          shouldClose = false;
+      }
+
+      // === 条件②：盈利但破位EMA21或中轨，止盈 ===
+      else if (prevClose < prevEMA || prevClose < bollMiddle) {
+        shouldClose = true;
+        reason = '止盈破位';
+        log(`🔸 ${symbol} 盈利但破位，触发止盈`);
+      }
+
+      // === 条件③：持仓超过6分钟 且 收益率不足1%，止盈效率不佳 ===
+      else {
+        const now = Date.now();
+        const heldMinutes = (now - entryTime) / 60000;
+
+        if (heldMinutes > 6 && pnlRate < 0.01) {
+          shouldClose = true;
+          reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足1%`;
+          log(`⚠️ ${symbol} 超时无明显盈利，触发平仓`);
         } else {
-          shouldClose = false;
           log(`✅ ${symbol} 盈利状态良好，继续持有`);
         }
       }
 
-      // 执行平仓操作
+      // === 平仓动作 ===
       if (shouldClose) {
         const side = isLong ? 'SELL' : 'BUY'; // 平掉原方向
-        await placeOrder(symbol, side, positionAmt); // 发起市价单平仓
-        sendTelegramMessage(`📤 ${symbol} 仓位已平仓，原因：${pnlRate < 0 ? '止损' : '止盈破位'}`);
-        removePosition(symbol); // 删除本地缓存中的持仓
+        await placeOrder(symbol, side, positionAmt); // 市价平仓
+        sendTelegramMessage(`📤 ${symbol} 仓位已平仓，原因：${reason}`);
+        removePosition(symbol);
       }
 
     } catch (err) {
