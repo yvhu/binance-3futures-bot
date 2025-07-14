@@ -77,7 +77,7 @@ async function sendMainMenu() {
   const strategyType = getStrategyType();
   const strategyList = getAllStrategies();
 
-  const buttons = strategyType == 'ema_boll' ? [
+  const buttons = strategyType !== 'ema_boll' ? [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
