@@ -106,8 +106,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     score = shortScore;
   }
 
-  log(`✅ ${symbol}: side=${signal}, longScore=${longScore}, shortScore=${shortScore}`);
-  log(`${symbol} → close=${lastClose.toFixed(4)}, ema5=${lastEma5.toFixed(4)}, ema13=${lastEma13.toFixed(4)}, vwap=${lastVWAP.toFixed(4)}`);
+  // log(`✅ ${symbol}: side=${signal}, longScore=${longScore}, shortScore=${shortScore}`);
+  // log(`${symbol} → close=${lastClose.toFixed(4)}, ema5=${lastEma5.toFixed(4)}, ema13=${lastEma13.toFixed(4)}, vwap=${lastVWAP.toFixed(4)}`);
 
   if (!signal) return null;
   return { symbol, side: signal, score };
@@ -120,7 +120,7 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
 
   for (const symbol of symbolList) {
     try {
-      log(`✅ ${symbol} 开始校验:`);
+      // log(`✅ ${symbol} 开始校验:`);
       const res = await evaluateSymbolWithScore(symbol);
       if (!res) continue;
       if (res?.side === 'LONG') longList.push(res);
