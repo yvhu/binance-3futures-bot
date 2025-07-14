@@ -19,7 +19,7 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
-
+const { getStrategyType, getAllStrategies } = require('../utils/strategy');
 const { cachePositionRatio, getCachedPositionRatio } = require('../utils/cache');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
@@ -51,7 +51,7 @@ async function initTelegramBot() {
     const chatId = query.message.chat.id;
     await handleCommand(data, chatId);
   });
-  
+
   bot.onText(/\/button/, async (msg) => {
     const chatId = msg.chat.id;
     if (chatId.toString() === config.telegram.chatId.toString()) {
@@ -87,6 +87,15 @@ async function sendMainMenu() {
     { text: '💰 使用100%', callback_data: 'ratio_1' }
   ];
   buttons.push(ratioButtons);
+
+  const strategyType = getStrategyType();
+  const strategyList = getAllStrategies();
+
+  const strategyButtons = strategyList.map(s => {
+    const isSelected = s.id === strategyType;
+    return [{ text: `${isSelected ? '✅' : ''} 切换为 ${s.name}`, callback_data: `set_strategy_${s.id}` }];
+  });
+  buttons.push(...strategyButtons);
 
   try {
     const { longList, shortList } = await selectBestSymbols();
@@ -127,6 +136,7 @@ async function handleCommand(data, chatId) {
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
     const cachedRatio = getCachedPositionRatio();
+    const strategy = getAllStrategies().find(s => s.id === strategyId);
     let directionText = '无';
     if (selectedSymbol) {
       const position = getPosition(selectedSymbol);
@@ -142,6 +152,7 @@ async function handleCommand(data, chatId) {
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
 - 选中币种：${selectedSymbol || '无'}
 - 方向：${directionText}
+- 当前策略：${strategy}
 - 最新下单比例：${cachedRatio * 100}%`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
@@ -182,6 +193,16 @@ async function handleCommand(data, chatId) {
       sendTelegramMessage(`✅ 下单比例已设置为 ${ratio * 100}%`);
     } else {
       sendTelegramMessage('❌ 比例设置失败，格式不正确');
+    }
+  } else if (data.startsWith('set_strategy_')) {
+    const strategyId = data.replace('set_strategy_', '');
+    const strategy = getAllStrategies().find(s => s.id === strategyId);
+    if (strategy) {
+      setStrategyType(strategy.id);
+      sendTelegramMessage(`✅ 当前策略已切换为：${strategy.name}`);
+      await sendMainMenu(); // 刷新按钮状态
+    } else {
+      sendTelegramMessage('❌ 未找到该策略类型');
     }
   }
 }

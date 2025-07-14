@@ -10,14 +10,29 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未捕获的 Promise 异常：', reason);
 });
 
+const { getStrategyType } = require('../utils/strategy');
+
+async function runStrategyCycle() {
+  const strategy = getStrategyType();
+  if (strategy === 'ema_boll') {
+    await startSchedulerNew();
+  } else if (strategy === 'macd_rsi') {
+    await startScheduler();
+  } else {
+    log(`❓ 未定义的策略类型: ${strategy}`);
+  }
+}
+
+
 (async () => {
   try {
     log('🚀 启动自动交易策略服务...');
     log('Telegram Token:', config.telegram.token);
     await initTelegramBot();          // 初始化 TG 按钮控制
     await cacheTopSymbols();          // 启动时获取Top50币种
+    await runStrategyCycle()
     // await startScheduler();           // 定时策略
-    await startSchedulerNew();
+    // await startSchedulerNew();
   } catch (error) {
     console.error('❌ 启动失败:', error.message);
   }
