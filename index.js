@@ -10,7 +10,7 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未捕获的 Promise 异常：', reason);
 });
 
-const { getStrategyType } = require('../utils/strategy');
+const { getStrategyType } = require('./utils/strategy');
 
 async function runStrategyCycle() {
   const strategy = getStrategyType();
