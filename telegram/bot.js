@@ -149,6 +149,7 @@ async function handleCommand(data, chatId) {
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
     const cachedRatio = getCachedPositionRatio();
+    const strategyType = getStrategyType();
     let directionText = '无';
     if (selectedSymbol) {
       const position = getPosition(selectedSymbol);
@@ -164,6 +165,7 @@ async function handleCommand(data, chatId) {
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
 - 选中币种：${selectedSymbol || '无'}
 - 方向：${directionText}
+- 策略类型：${strategyType}
 - 最新下单比例：${cachedRatio * 100}%`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
