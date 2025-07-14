@@ -163,10 +163,10 @@ async function handleCommand(data, chatId) {
     }
     const statusText = `📊 当前策略状态：
 - 状态：${serviceStatus.running ? '✅ 运行中' : '⏸ 暂停中'}
-- 选中币种：${selectedSymbol || '无'}
-- 方向：${directionText}
+${strategyType == 'ema_boll' ? undefined : `- 选中币种：${selectedSymbol || '无'}`}
+${strategyType == 'ema_boll' ? undefined : `- 方向：${directionText}`}
 - 策略类型：${strategyType}
-- 最新下单比例：${cachedRatio * 100}%`;
+${strategyType == 'ema_boll' ? undefined : `- 最新下单比例：${cachedRatio * 100}%`}`;
     sendTelegramMessage(statusText);
   } else if (data === 'refresh_top50') {
     await cacheTopSymbols(); // 刷新 Top50 缓存
