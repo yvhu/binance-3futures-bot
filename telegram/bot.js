@@ -74,22 +74,31 @@ async function sendMainMenu() {
     return;
   }
 
-  const buttons = [
+  const strategyType = getStrategyType();
+  const strategyList = getAllStrategies();
+
+  const buttons = strategyType == 'ema_boll' ? [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '🧹 清空已选币种', callback_data: 'clear_selected' }]
+  ]: [
+    [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
+    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
+    [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
   ];
+
   const ratioButtons = [
     { text: '💰 使用25%', callback_data: 'ratio_0.25' },
     { text: '💰 使用50%', callback_data: 'ratio_0.5' },
     { text: '💰 使用75%', callback_data: 'ratio_0.75' },
     { text: '💰 使用100%', callback_data: 'ratio_1' }
   ];
-  buttons.push(ratioButtons);
-
-  const strategyType = getStrategyType();
-  const strategyList = getAllStrategies();
+  if (strategyType == 'ema_boll') {
+    log(`⚠️ 策略类型是： ${strategyType}, 不填加 持仓数量按钮`);
+  } else {
+    buttons.push(ratioButtons);
+  }
 
   const strategyButtons = strategyList.map(s => {
     const isSelected = s.id === strategyType;
@@ -97,18 +106,22 @@ async function sendMainMenu() {
   });
   buttons.push(...strategyButtons);
 
-  try {
-    const { longList, shortList } = await selectBestSymbols();
-    if (longList.length > 0) {
-      const longButtons = longList.map(item => [{ text: `做多 ${item.symbol}`, callback_data: `long_${item.symbol}` }]);
-      buttons.push(...longButtons);
+  if (strategyType == 'ema_boll') {
+    log(`⚠️ 策略类型是： ${strategyType}, 不填加 币种多空方向按钮`);
+  } else {
+    try {
+      const { longList, shortList } = await selectBestSymbols();
+      if (longList.length > 0) {
+        const longButtons = longList.map(item => [{ text: `做多 ${item.symbol}`, callback_data: `long_${item.symbol}` }]);
+        buttons.push(...longButtons);
+      }
+      if (shortList.length > 0) {
+        const shortButtons = shortList.map(item => [{ text: `做空 ${item.symbol}`, callback_data: `short_${item.symbol}` }]);
+        buttons.push(...shortButtons);
+      }
+    } catch (err) {
+      log('⚠️ 选币失败:', err.message);
     }
-    if (shortList.length > 0) {
-      const shortButtons = shortList.map(item => [{ text: `做空 ${item.symbol}`, callback_data: `short_${item.symbol}` }]);
-      buttons.push(...shortButtons);
-    }
-  } catch (err) {
-    log('⚠️ 选币失败:', err.message);
   }
 
   await bot.sendMessage(config.telegram.chatId, '🎯 策略控制面板', {
