@@ -22,3 +22,14 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ 启动失败:', error.message);
   }
 })();
+
+
+/**
+ * 1. TG发送的按钮调整
+ *  1.1 按钮支持策略选择
+ *  1.2 按时定点的发送一次按钮？
+ * 2. 获取T50币种缓存
+ * 3. 按照策略获取币种并缓存
+ * 4. 下单成功
+ * ...
+ */
