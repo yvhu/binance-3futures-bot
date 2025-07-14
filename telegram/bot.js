@@ -49,12 +49,6 @@ async function initTelegramBot() {
   bot.on('callback_query', async (query) => {
     const data = query.data;
     const chatId = query.message.chat.id;
-        // ✅ 如果按钮回调是 'button'，仅显示控制面板
-    if (data === 'button') {
-      await sendMainMenu();
-      return;
-    }
-    
     await handleCommand(data, chatId);
   });
 
@@ -115,6 +109,9 @@ async function handleCommand(data, chatId) {
   if (data === 'start') {
     serviceStatus.running = true;
     sendTelegramMessage('✅ 策略已启动');
+  } else if (data === 'button') {
+    await sendMainMenu(); // 单独发送面板
+    sendTelegramMessage('🔄 面板信息已更新');
   } else if (data === 'stop') {
     serviceStatus.running = false;
     sendTelegramMessage('⏸ 策略已暂停');
