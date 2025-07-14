@@ -21,7 +21,7 @@ const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils/strategy');
 const { cachePositionRatio, getCachedPositionRatio } = require('../utils/cache');
-const { setOrderMode, getOrderMode } = require('../utils/cache');
+const { setOrderMode, getOrderMode } = require('../utils/state');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
