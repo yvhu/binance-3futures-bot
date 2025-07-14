@@ -49,6 +49,12 @@ async function initTelegramBot() {
   bot.on('callback_query', async (query) => {
     const data = query.data;
     const chatId = query.message.chat.id;
+        // ✅ 如果按钮回调是 'button'，仅显示控制面板
+    if (data === 'button') {
+      await sendMainMenu();
+      return;
+    }
+    
     await handleCommand(data, chatId);
   });
 
