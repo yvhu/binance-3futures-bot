@@ -110,6 +110,7 @@ async function handleCommand(data, chatId) {
     serviceStatus.running = true;
     sendTelegramMessage('✅ 策略已启动');
   } else if (data === 'button') {
+    log(`命令进入当前位置：${data}`);
     await sendMainMenu(); // 单独发送面板
     sendTelegramMessage('🔄 面板信息已更新');
   } else if (data === 'stop') {
