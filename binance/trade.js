@@ -127,7 +127,7 @@ async function setLeverage(symbol, leverage) {
 async function placeOrder(symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol);
   await setLeverage(symbol, config.leverage); // 👈 仅首次设置有效，重复设置也没影响
-  log(`📥 是否平仓${positionAmt ? '是' : '否'}, 数量: ${positionAmt}`);
+  log(`📥 是否平仓：${positionAmt ? '是' : '否'}, 数量: ${positionAmt ? positionAmt : 0}`);
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
   // === 获取币种精度并格式化数量 ===
   const precision = getSymbolPrecision(symbol);
