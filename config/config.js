@@ -14,7 +14,7 @@ module.exports = {
   positionRatio: 0.1,
 
   // 'ratio' | 'amount'，默认 ratio
-  orderMode: 'ratio',
+  orderMode: 'amount',
   // 当按金额下单时默认金额
   fixedAmountUSDT: 10,
 
