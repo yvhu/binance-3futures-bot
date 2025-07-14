@@ -13,6 +13,11 @@ module.exports = {
   // 每次下单占用的USDT比例（如10%，即总资金的10%）
   positionRatio: 0.1,
 
+  // 'ratio' | 'amount'，默认 ratio
+  orderMode: 'ratio',
+  // 当按金额下单时默认金额
+  fixedAmountUSDT: 10,
+
   // ================== EMA 均线设置 ==================
   ema: {
     shortPeriod: 7,     // 短期 EMA（如7）用于快速反应价格变化，常用于捕捉买卖信号

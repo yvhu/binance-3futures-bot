@@ -6,40 +6,65 @@ const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
 const { shouldCloseByExitSignal } = require('../indicators/analyzer');
 const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
-const {getCurrentPrice} = require('./market');
+const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 
 /**
- * 计算可下单数量（合约张数）
- * 使用当前账户USDT余额 * 杠杆 * 配置比例计算
- * @param {string} symbol 交易对
- * @param {number} price 当前价格
- * @returns {number} 下单数量（张数，保留3位小数）
+ * 计算下单数量，根据配置选择按比例或固定金额下单
+ * - 若为固定金额，默认10U，不足则不下单
+ * @param {string} symbol 币种，如 BTCUSDT
+ * @param {number} price 当前市价
+ * @returns {number} 可下单数量（处理过精度），不足最小值返回 0
  */
 async function calcOrderQty(symbol, price) {
-  const usdtBalance = await getUSDTBalance();
-    // ✅ 使用缓存的 positionRatio，默认 1（100%）
-  const cachedRatio = getCachedPositionRatio();
-  const ratio = cachedRatio !== null ? cachedRatio : config.positionRatio || 1;
-  const totalUSDT = usdtBalance * ratio;
-  // 计算原始张数（未处理精度）
-  let rawQty = (totalUSDT * config.leverage) / price;
-  // === 获取币种精度信息（pricePrecision, quantityPrecision）===
+  const mode = config.orderMode || 'ratio'; // 默认为比例模式
+  const leverage = config.leverage || 10;
+
+  let usdtBalance = await getUSDTBalance(); // 当前总余额
+  let usdtAmount = 0;
+
+  if (mode === 'amount') {
+    // ===== 固定金额模式 =====
+    const fixedAmount = config.fixedAmountUSDT || 10;
+
+    if (usdtBalance < fixedAmount) {
+      log(`❌ 余额不足固定下单金额：${usdtBalance} < ${fixedAmount}，跳过下单`);
+      return 0;
+    }
+
+    usdtAmount = fixedAmount;
+    log(`📌 使用固定金额模式下单：${fixedAmount} USDT`);
+  } else {
+    // ===== 比例模式 =====
+    const cachedRatio = getCachedPositionRatio();
+    const ratio = cachedRatio !== null ? cachedRatio : config.positionRatio || 1;
+    usdtAmount = usdtBalance * ratio;
+    log(`📌 使用比例下单模式：余额=${usdtBalance}，比例=${ratio * 100}% → 金额=${usdtAmount.toFixed(2)} USDT`);
+  }
+
+  // === 计算原始张数（未处理精度）===
+  let rawQty = (usdtAmount * leverage) / price;
+
+  // === 获取币种精度信息 ===
   const precision = getSymbolPrecision(symbol);
   if (!precision) {
-    throw new Error(`❌ 未找到 ${symbol} 精度信息，无法计算下单数量`);
+    throw new Error(`❌ 无法获取 ${symbol} 精度信息`);
   }
+
   const qtyPrecision = precision.quantityPrecision;
-  const minQty = precision.minQty || 0; // 可以从 cache 精度中扩展存储 minQty
-  // === 按精度保留小数位 ===
+  const minQty = precision.minQty || 0;
+
+  // === 四舍五入保留精度 ===
   const fixedQty = parseFloat(rawQty.toFixed(qtyPrecision));
-  // === 防止数量小于最小下单数量 ===
+
+  // === 检查是否满足最小下单数量 ===
   if (fixedQty <= 0 || (minQty && fixedQty < minQty)) {
-    log(`❌ 计算后数量过小: ${fixedQty}，小于最小要求`);
+    log(`❌ 数量过小：${fixedQty} < 最小值${minQty}`);
     return 0;
   }
+
   return fixedQty;
 }
 
