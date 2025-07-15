@@ -4,7 +4,7 @@ const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
 const { placeOrder } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
-const { refreshPositionsFromBinance } = require('../utils/position')
+const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
 const { removeFromTopSymbols, getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
@@ -31,9 +31,27 @@ async function checkLossTradesAndFilter() {
 
       if (lossCount > 2) {
         log(`⚠️ ${symbol} 近15分钟亏损次数超过2次(${lossCount}次)，从策略币种列表移除`);
+
+        // 🔍 检查是否有持仓，如有则立即平仓
+        const position = getPosition(symbol);
+        if (position) {
+          const oppositeSide = position.side === 'BUY' ? 'SELL' : 'BUY';
+          try {
+            await placeOrder(symbol, oppositeSide, position.positionAmt); // 使用平仓数量
+            log(`🧯 ${symbol} 已因连续亏损自动平仓`);
+            await sendTelegramMessage(`🧯 ${symbol} 由于连续亏损，持仓已被自动平仓`);
+          } catch (err) {
+            log(`❌ 平仓 ${symbol} 失败：`, err.message);
+            await sendTelegramMessage(`❌ 平仓 ${symbol} 失败，原因: ${err.message}`);
+          }
+        }
+
+        // 🚫 从策略币种中移除
         removeFromTopSymbols(symbol);
+
         // 发送Telegram通知
-        await sendTelegramMessage(`⚠️ 策略币种筛选：${symbol} 近15分钟亏损次数达到 ${lossCount} 次，已自动从策略币种列表移除。`);      }
+        await sendTelegramMessage(`⚠️ 策略币种筛选：${symbol} 近15分钟亏损次数达到 ${lossCount} 次，已自动从策略币种列表移除。`);
+      }
     }
   } catch (err) {
     log('❌ 检查交易亏损失败:', err);
