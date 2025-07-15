@@ -108,7 +108,7 @@ async function checkAndCloseLosingPositions() {
         const now = Date.now(); // 当前时间戳
         const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
 
-        if (heldMinutes > 6 && pnlRate < 0.01) {
+        if (heldMinutes > config.minHoldingMinutes && pnlRate < config.minProfitRate) {
           shouldClose = true;
           reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足1%`;
           log(`⚠️ ${symbol} 超时无明显盈利，触发平仓`);

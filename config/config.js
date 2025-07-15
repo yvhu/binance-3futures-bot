@@ -18,6 +18,12 @@ module.exports = {
     takeProfitRate: 0.1           // 止盈触发比例（盈利 10% = 0.1）
   },
 
+  // 最小持仓时间（分钟）
+  minHoldingMinutes: 6,
+
+  // 最低盈利率（小数形式，如0.01表示1%）
+  minProfitRate: 0.05,
+
   // 每次下单占用的USDT比例（如10%，即总资金的10%）
   positionRatio: 0.1,
 
