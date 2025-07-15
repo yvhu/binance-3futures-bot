@@ -17,8 +17,10 @@ async function startSchedulerNew() {
        *  2.1 如果当前收益率为负，卖出
        *  2.2 如果当前收益率为正，观察前一个收盘价是否跌破EMA(21),前一个收盘价在BOLL中轨上方
        */
+      
+      await refreshPositionsFromBinance();
       // 检查是否平仓
-      await checkAndCloseLosingPositions()
+      await checkAndCloseLosingPositions();
 
       log('⏱ 执行定时策略轮询...');
       const topSymbols = getCachedTopSymbols();
@@ -37,7 +39,6 @@ async function startSchedulerNew() {
         await placeOrder(long.symbol, 'SELL'); // 策略运行时才下单
         log(`✅ 做空 ${short.symbol}，信号分数 ${short.score}`);
       }}
-      refreshPositionsFromBinance()
     }
   });
   log('✅ 定时器启动，每3分钟运行一次');

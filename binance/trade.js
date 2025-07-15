@@ -119,55 +119,125 @@ async function setLeverage(symbol, leverage) {
   }
 }
 
+// 撤销 symbol 上所有 STOP_MARKET 类型的订单
+async function cancelAllOpenStopOrders(symbol) {
+  try {
+    const timestamp = Date.now();
+    const url = `${BINANCE_API}/fapi/v1/openOrders?symbol=${symbol}&timestamp=${timestamp}`;
+    const signature = crypto
+      .createHmac('sha256', config.binance.apiSecret)
+      .update(`symbol=${symbol}&timestamp=${timestamp}`)
+      .digest('hex');
+
+    const finalUrl = `${url}&signature=${signature}`;
+    const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
+    const res = await proxyGet(finalUrl, { headers });
+    const openOrders = res.data || [];
+
+    const stopOrders = openOrders.filter(o => o.type === 'STOP_MARKET');
+
+    for (const order of stopOrders) {
+      const cancelUrl = `${BINANCE_API}/fapi/v1/order?symbol=${symbol}&orderId=${order.orderId}&timestamp=${Date.now()}`;
+      const cancelSignature = crypto
+        .createHmac('sha256', config.binance.apiSecret)
+        .update(`symbol=${symbol}&orderId=${order.orderId}&timestamp=${Date.now()}`)
+        .digest('hex');
+
+      const cancelFinalUrl = `${cancelUrl}&signature=${cancelSignature}`;
+      await proxyDelete(cancelFinalUrl, { headers });
+
+      log(`🗑 已撤销止损单：${symbol} - ID ${order.orderId}`);
+    }
+
+  } catch (err) {
+    log(`❌ 撤销止损单失败 ${symbol}: ${err.message}`);
+    sendTelegramMessage(`⚠️ 撤销止损单失败 ${symbol}，请手动检查`);
+  }
+}
+
 /**
  * 市价下单接口（全仓操作）
  * @param {string} symbol 交易对，例如 BTCUSDT
  * @param {string} side 买入BUY 或 卖出SELL
  */
 async function placeOrder(symbol, side = 'BUY', positionAmt) {
-  const price = await getCurrentPrice(symbol);
-  await setLeverage(symbol, config.leverage); // 👈 仅首次设置有效，重复设置也没影响
+  const price = await getCurrentPrice(symbol); // 当前市价
+  await setLeverage(symbol, config.leverage); // 👈 设置杠杆，重复设置也不会报错
   log(`📥 是否平仓：${positionAmt ? '是' : '否'}, 数量: ${positionAmt ? positionAmt : 0}`);
+
+  // 计算下单数量：若传入 positionAmt 说明是平仓，否则根据可用资金计算
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
+
   // === 获取币种精度并格式化数量 ===
   const precision = getSymbolPrecision(symbol);
   if (!precision) {
     throw new Error(`找不到币种 ${symbol} 的精度信息`);
   }
+
   // 四舍五入到指定数量精度
   const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
   const timestamp = Date.now();
-  // 构造请求参数
+
+  // 构造市价单请求参数
   const data = new URLSearchParams({
     symbol,
     side,
-    type: 'MARKET',       // 市价单
+    type: 'MARKET',
     quantity: qty,
     timestamp: timestamp.toString()
   });
+
   // 生成签名
   const signature = crypto
     .createHmac('sha256', config.binance.apiSecret)
     .update(data.toString())
     .digest('hex');
+
   const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
   try {
-    // 执行下单请求
+    // === 如果是平仓操作，先撤销未完成止损单 ===
+    if (positionAmt) {
+      await cancelAllOpenStopOrders(symbol); // ⬅️ 需要你实现这个函数
+    }
+
+    // 执行市价下单请求
     const res = await proxyPost(finalUrl, null, { headers });
-    // 持仓数量带方向，买多为正，卖空为负
-    const positionAmt = side === 'BUY' ? qty : -qty;
-    const entryPrice = price;
-    // 记录持仓方向和时间
-    // setPosition(symbol, {
-    //   time: Date.now(),
-    //   side,
-    //   positionAmt,  // 记录持仓数量
-    //   entryPrice,
-    // });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
+
+    // === 如果是开仓，挂止损单（亏损20%止损） ===
+    if (!positionAmt) {
+      const stopSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止损方向反向
+      const stopPrice = side === 'BUY'
+        ? (price * 0.98).toFixed(precision.pricePrecision) // 多单：当前价格下跌2%
+        : (price * 1.02).toFixed(precision.pricePrecision); // 空单：当前价格上涨2%
+
+      const stopParams = new URLSearchParams({
+        symbol,
+        side: stopSide,
+        type: 'STOP_MARKET',
+        stopPrice: stopPrice,
+        closePosition: 'true',
+        timestamp: Date.now().toString()
+      });
+
+      const stopSignature = crypto
+        .createHmac('sha256', config.binance.apiSecret)
+        .update(stopParams.toString())
+        .digest('hex');
+
+      const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
+
+      const stopRes = await proxyPost(stopUrl, null, { headers });
+      log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
+      sendTelegramMessage(`📉 已挂止损单：${symbol} 方向: ${stopSide}，触发价: ${stopPrice}`);
+    }
+
     return res.data;
+
   } catch (err) {
     log(`❌ 下单失败 ${side} ${symbol}:`, err.response?.data || err.message);
     sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${err.response?.data?.msg || err.message}`);
