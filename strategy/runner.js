@@ -4,6 +4,7 @@ const { placeOrder, closePositionIfNeeded } = require('../binance/trade');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { hasPosition } = require('../utils/position');
+const { refreshPositionsFromBinance, getPosition } = require('../utils/position');
 
 async function runStrategyCycle() {
   const symbol = getSelectedSymbol();
@@ -34,6 +35,7 @@ async function runStrategyCycle() {
   } catch (err) {
     log(`❌ 分析信号失败：${err.message}`);
   }
+  refreshPositionsFromBinance()
 }
 
 

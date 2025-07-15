@@ -5,6 +5,7 @@ const { getCachedTopSymbols } = require('../utils/cache');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
 const { placeOrder } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
+const { refreshPositionsFromBinance } = require('../utils/position')
 
 async function startSchedulerNew() {
   cron.schedule('*/3 * * * *', async () => {
@@ -36,6 +37,7 @@ async function startSchedulerNew() {
         await placeOrder(long.symbol, 'SELL'); // 策略运行时才下单
         log(`✅ 做空 ${short.symbol}，信号分数 ${short.score}`);
       }}
+      refreshPositionsFromBinance()
     }
   });
   log('✅ 定时器启动，每3分钟运行一次');

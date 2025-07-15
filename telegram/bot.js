@@ -218,6 +218,7 @@ async function handleCommand(data, chatId) {
     } catch (err) {
       console.error(`下单失败: ${symbol}`, err.message);
     }
+    refreshPositionsFromBinance()
   } else if (data === 'clear_selected') {
     clearSelectedSymbol();
     sendTelegramMessage('🧹 已清空选中币种缓存');

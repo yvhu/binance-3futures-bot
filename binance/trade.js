@@ -159,12 +159,12 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
     const positionAmt = side === 'BUY' ? qty : -qty;
     const entryPrice = price;
     // 记录持仓方向和时间
-    setPosition(symbol, {
-      time: Date.now(),
-      side,
-      positionAmt,  // 记录持仓数量
-      entryPrice,
-    });
+    // setPosition(symbol, {
+    //   time: Date.now(),
+    //   side,
+    //   positionAmt,  // 记录持仓数量
+    //   entryPrice,
+    // });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     return res.data;

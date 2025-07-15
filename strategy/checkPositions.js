@@ -27,83 +27,111 @@ async function fetchKlines(symbol, interval, limit = 50) {
  * - 若当前收益为负，则强制止损
  * - 若当前收益为正，则判断是否跌破 EMA21，或前一K线在 BOLL 中轨下方，满足条件保留，否则止盈
  */
+// 异步函数：检查本地缓存的所有持仓，并根据条件判断是否需要平仓
 async function checkAndCloseLosingPositions() {
-  const allPositions = readAllPositions(); // 读取本地缓存的持仓记录
+  // 从本地缓存中读取所有当前持仓数据，例如：{ BTCUSDT: { entryPrice, side, positionAmt, time }, ... }
+  const allPositions = readAllPositions();
 
+  // 遍历每一个持仓币种
   for (const symbol in allPositions) {
     try {
-      const pos = allPositions[symbol]; // 持仓信息：{ entryPrice, side, positionAmt, time }
+      // 获取当前币种的持仓信息
+      const pos = allPositions[symbol]; // 包含：进场价格、方向（BUY/SELL）、持仓数量、持仓时间
 
-      const klines = await fetchKlines(symbol, '3m', 100);
-      if (!klines || klines.length < 30) continue;
+      const interval = '3m'; // 使用3分钟K线
+      const limit = 100;     // 请求K线数量
 
+      // 获取币种K线数据，并剔除最后一根未收盘的K线（slice 0 到 -1）
+      const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+      if (!klines || klines.length < 30) continue; // 数据不足则跳过
+
+      // 提取收盘价数组
       const closePrices = klines.map(k => k.close);
+
+      // 计算21周期的EMA（用于趋势判断）
       const ema21 = EMA.calculate({ period: 21, values: closePrices });
+
+      // 计算20周期的布林带指标（返回上轨/中轨/下轨）
       const boll = BollingerBands.calculate({ period: 20, values: closePrices });
+
+      // 若指标数组不足两个点（正常应等于K线数量 - period），跳过该币种
       if (ema21.length < 2 || boll.length < 2) continue;
 
-      const lastKline = klines[klines.length - 2]; // 倒数第二根K线
+      // 取倒数第一根K线（已收盘）用于判断信号
+      const lastKline = klines[klines.length - 1];
+
+      // 获取该K线的收盘价
       const prevClose = lastKline.close;
-      const prevEMA = ema21[ema21.length - 2];
-      const prevBOLL = boll[boll.length - 2];
+
+      // 获取对应位置的 EMA21 和布林中轨值
+      const prevEMA = ema21[ema21.length - 1];
+      const prevBOLL = boll[boll.length - 1];
       const bollMiddle = prevBOLL.middle;
 
+      // 提取持仓数据：进场价、持仓数量、进场时间戳、方向
       const entryPrice = pos.entryPrice;
       const positionAmt = pos.positionAmt;
       const entryTime = pos.time;
-      const isLong = pos.side === 'BUY';
+      const isLong = pos.side === 'BUY'; // 判断是否为多单
 
+      // 获取最新一根收盘K线的收盘价作为当前价（用于计算收益率）
       const currentPrice = closePrices[closePrices.length - 1];
 
+      // 计算当前收益率（多单为当前-进场/进场，空单相反）
       const pnlRate = isLong
         ? (currentPrice - entryPrice) / entryPrice
         : (entryPrice - currentPrice) / entryPrice;
 
+      // 打印当前收益率
       log(`${symbol} 当前收益率：${(pnlRate * 100).toFixed(2)}%`);
 
+      // 是否需要平仓的标志位及理由
       let shouldClose = false;
       let reason = '';
 
-      // === 条件①：亏损则止损 ===
+      // === 条件①：当前是亏损状态，触发止损 ===
       if (pnlRate < 0) {
         shouldClose = true;
         reason = '止损';
         log(`🔻 ${symbol} 亏损止损触发`);
       }
 
-      // === 条件②：盈利但破位EMA21或中轨，止盈 ===
+      // === 条件②：虽然是盈利状态，但价格跌破EMA21或布林中轨，视为趋势破位，触发止盈 ===
       else if (prevClose < prevEMA || prevClose < bollMiddle) {
         shouldClose = true;
         reason = '止盈破位';
         log(`🔸 ${symbol} 盈利但破位，触发止盈`);
       }
 
-      // === 条件③：持仓超过6分钟 且 收益率不足1%，止盈效率不佳 ===
+      // === 条件③：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
       else {
-        const now = Date.now();
-        const heldMinutes = (now - entryTime) / 60000;
+        const now = Date.now(); // 当前时间戳
+        const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
 
         if (heldMinutes > 6 && pnlRate < 0.01) {
           shouldClose = true;
           reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足1%`;
           log(`⚠️ ${symbol} 超时无明显盈利，触发平仓`);
         } else {
+          // 不满足平仓条件，继续持有
           log(`✅ ${symbol} 盈利状态良好，继续持有`);
         }
       }
 
-      // === 平仓动作 ===
+      // === 执行平仓动作 ===
       if (shouldClose) {
-        const side = isLong ? 'SELL' : 'BUY'; // 平掉原方向
-        await placeOrder(symbol, side, positionAmt); // 市价平仓
-        sendTelegramMessage(`📤 ${symbol} 仓位已平仓，原因：${reason}`);
-        removePosition(symbol);
+        const side = isLong ? 'SELL' : 'BUY'; // 平仓方向为原方向的反向
+        await placeOrder(symbol, side, positionAmt); // 发送市价单平仓
+        sendTelegramMessage(`📤 ${symbol} 仓位已平仓，原因：${reason}`); // 通知Telegram
+        removePosition(symbol); // 从本地缓存中移除该币种持仓记录
       }
 
     } catch (err) {
+      // 捕获该币种处理过程中的异常，记录错误信息
       log(`❌ 检查持仓 ${symbol} 时失败：${err.message}`);
     }
   }
 }
+
 
 module.exports = { checkAndCloseLosingPositions };
