@@ -10,6 +10,14 @@ module.exports = {
   // 使用的杠杆倍数（10倍杠杆）
   leverage: 10,
 
+  // 止盈止损配置
+  riskControl: {
+    enableStopLoss: true,         // 是否启用止损单
+    stopLossRate: 0.008,           // 止损触发比例（亏损 2% = 0.02）
+    enableTakeProfit: false,      // 是否启用止盈单（预留）
+    takeProfitRate: 0.1           // 止盈触发比例（盈利 10% = 0.1）
+  },
+
   // 每次下单占用的USDT比例（如10%，即总资金的10%）
   positionRatio: 0.1,
 

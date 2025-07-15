@@ -9,6 +9,9 @@ const { getPosition, setPosition, removePosition, hasPosition } = require('../ut
 const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
 const { getOrderMode } = require('../utils/state');
+// === 止损参数配置 ===
+const { enableStopLoss, stopLossRate } = config.riskControl;
+
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 
@@ -209,11 +212,13 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
 
     // === 如果是开仓，挂止损单（亏损20%止损） ===
-    if (!positionAmt) {
-      const stopSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止损方向反向
+    // === 止损参数配置 ===
+    if (!positionAmt && enableStopLoss) {
+      const stopSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止损方向与开仓方向相反
+      // 根据开仓方向计算止损触发价格，支持自定义止损比率
       const stopPrice = side === 'BUY'
-        ? (price * 0.98).toFixed(precision.pricePrecision) // 多单：当前价格下跌2%
-        : (price * 1.02).toFixed(precision.pricePrecision); // 空单：当前价格上涨2%
+        ? (price * (1 - stopLossRate)).toFixed(precision.pricePrecision)
+        : (price * (1 + stopLossRate)).toFixed(precision.pricePrecision);
 
       const stopParams = new URLSearchParams({
         symbol,
@@ -230,7 +235,6 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
         .digest('hex');
 
       const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
-
       const stopRes = await proxyPost(stopUrl, null, { headers });
       log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
       sendTelegramMessage(`📉 已挂止损单：${symbol} 方向: ${stopSide}，触发价: ${stopPrice}`);
