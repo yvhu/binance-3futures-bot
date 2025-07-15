@@ -172,6 +172,13 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
   // 计算下单数量：若传入 positionAmt 说明是平仓，否则根据可用资金计算
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
 
+  // 🧩 如果是开仓操作，且数量无效，跳过该币种下单
+  if (!positionAmt && (!qtyRaw || qtyRaw <= 0)) {
+    log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
+    sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 0，可能因为余额不足或不满足最小下单量`);
+    return;
+  }
+
   // === 获取币种精度并格式化数量 ===
   const precision = getSymbolPrecision(symbol);
   if (!precision) {
