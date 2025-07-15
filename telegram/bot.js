@@ -153,8 +153,9 @@ async function sendMainMenu() {
  * 发送币种按钮
  */
 async function sendSymbolFilterMenu() {
+  const bot = require('./state').getBot();
   if (!bot) {
-    log('⚠️ 发送币种筛选菜单失败，bot 未初始化');
+    log('⚠️ 发送主菜单失败，bot 未初始化');
     return;
   }
 
