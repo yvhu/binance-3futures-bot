@@ -5,9 +5,25 @@ const { log } = require('./logger');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const crypto = require('crypto');
 const config = require('../config/config');
+const { EMA, BollingerBands } = require('technicalindicators');
 
 const POSITION_FILE = path.resolve(__dirname, '../cache/position.json');
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
+
+// 获取指定币种的 K 线数据（默认获取 50 根）
+async function fetchKlines(symbol, interval, limit = 50) {
+  const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const response = await proxyGet(url);
+
+  return response.data.map(k => ({
+    time: k[0],
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5])
+  }));
+}
 
 // 初始化文件
 function ensurePositionFile() {
@@ -85,11 +101,32 @@ async function refreshPositionsFromBinance() {
       const side = amt > 0 ? 'BUY' : 'SELL';
       const time = Date.now();
       const positionAmt = amt;
-      const entryPrice = parseFloat(pos.entryPrice);;
+      const entryPrice = parseFloat(pos.entryPrice);
 
-      setPosition(symbol, { time, side, positionAmt, entryPrice });
+      // === 新增：获取当前K线，用于计算 entryEMA 和 entryBOLL ===
+      const interval = '3m';
+      const klines = (await fetchKlines(symbol, interval, 51)).slice(0, -1);
+      if (!klines || klines.length < 30) continue;
+
+      const closePrices = klines.map(k => k.close);
+
+      const ema21 = EMA.calculate({ period: 21, values: closePrices });
+      const boll = BollingerBands.calculate({ period: 20, values: closePrices });
+
+      if (ema21.length === 0 || boll.length === 0) continue;
+
+      const entryEMA = ema21[ema21.length - 1];
+      const entryBOLL = boll[boll.length - 1].middle;
+      // === 写入本地持仓缓存，包括 entryEMA/BOLL 中轨 ===
+      setPosition(symbol, {
+        time,
+        side,
+        positionAmt,
+        entryPrice,
+        entryEMA,
+        entryBOLL
+      });
     }
-
     log(`✅ 已从币安刷新持仓，共 ${allPositions.filter(p => parseFloat(p.positionAmt) !== 0).length} 个币种`);
   } catch (err) {
     log(`❌ 获取持仓失败：${err.response?.data?.msg || err.message}`);

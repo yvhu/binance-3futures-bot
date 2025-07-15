@@ -5,6 +5,7 @@ const { sendTelegramMessage } = require('../telegram/messenger');
 const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
+const { isSideways } = require('../utils/sideways');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -97,13 +98,29 @@ async function checkAndCloseLosingPositions() {
       }
 
       // === 条件②：虽然是盈利状态，但价格跌破EMA21或布林中轨，视为趋势破位，触发止盈 ===
-      else if (prevClose < prevEMA || prevClose < bollMiddle) {
+      else if (
+        pnlRate > 0 &&   // ① 当前持仓是盈利状态（如果是亏损，不能触发止盈）
+        (
+          (pos.entryPrice > pos.entryEMA && prevClose < prevEMA) ||   // ②A. 入场时高于EMA21，现价跌破EMA21
+          (pos.entryPrice > pos.entryBOLL && prevClose < bollMiddle)  // ②B. 入场时高于BOLL中轨，现价跌破中轨
+        )
+      ) {
         shouldClose = true;
         reason = '止盈破位';
         log(`🔸 ${symbol} 盈利但破位，触发止盈`);
       }
 
-      // === 条件③：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
+      // 在条件③：横盘判断处替换为：
+      else if (config.sidewaysExit?.enable && pnlRate > 0) {
+        const { sideways, reason: sidewaysReason } = isSideways(closePrices, boll, config.sidewaysExit);
+        if (sideways) {
+          shouldClose = true;
+          reason = sidewaysReason;
+          log(`🔹 ${symbol} ${sidewaysReason}`);
+        }
+      }
+
+      // === 条件④：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
       else {
         const now = Date.now(); // 当前时间戳
         const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
