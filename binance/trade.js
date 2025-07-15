@@ -362,7 +362,43 @@ async function closePositionIfNeeded(symbol) {
   }
 }
 
+/**
+ * 获取账户指定合约交易对的成交记录（userTrades）
+ * @param {string} symbol 交易对，如 BTCUSDT
+ * @param {number} startTime 过滤起始时间戳（毫秒）
+ * @returns {Promise<Array>} 交易记录数组
+ */
+async function getAccountTrades(symbol, startTime = 0) {
+  try {
+    const timestamp = Date.now();
+    const params = new URLSearchParams({
+      symbol,
+      timestamp: timestamp.toString(),
+      limit: '20',   // 最大100条，最大可调整，币安接口限制
+    });
+    if (startTime > 0) {
+      params.append('startTime', startTime.toString());
+    }
+    // 计算签名
+    const signature = crypto
+      .createHmac('sha256', config.binance.apiSecret)
+      .update(params.toString())
+      .digest('hex');
+
+    const url = `${BINANCE_API}/fapi/v1/userTrades?${params.toString()}&signature=${signature}`;
+    const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
+    const res = await proxyGet(url, { headers });
+    return res.data || [];
+  } catch (error) {
+    log(`❌ 获取交易记录失败 ${symbol}:`, error.response?.data || error.message);
+    sendTelegramMessage(`❌ 获取交易记录失败 ${symbol}，请检查API权限或网络`);
+    return [];
+  }
+}
+
 module.exports = {
   placeOrder,
-  closePositionIfNeeded
+  closePositionIfNeeded,
+  getAccountTrades
 };
