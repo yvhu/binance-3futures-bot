@@ -20,7 +20,7 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils/strategy');
-const { cachePositionRatio, getCachedPositionRatio } = require('../utils/cache');
+const { cachePositionRatio, getCachedPositionRatio, getCachedTopSymbols, removeFromTopSymbols } = require('../utils/cache');
 const { setOrderMode, getOrderMode } = require('../utils/state');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
@@ -109,6 +109,11 @@ async function sendMainMenu() {
       { text: `💵 固定金额下单 ${orderMode === 'amount' ? '✅' : ''}`, callback_data: 'order_mode_amount' }
     ];
     buttons.push(modeButtons);
+    // ✅ 新增：展示策略币种列表按钮
+    const symbolListButton = [
+      { text: '📋 查看策略币种列表', callback_data: 'show_symbol_list' }
+    ];
+    buttons.push(symbolListButton);
   } else {
     log(`⚠️ 策略类型是： ${strategyType}, 不填加 持仓数量按钮`);
   }
@@ -141,6 +146,44 @@ async function sendMainMenu() {
     reply_markup: {
       inline_keyboard: buttons
     }
+  });
+}
+
+/**
+ * 发送币种按钮
+ */
+async function sendSymbolFilterMenu() {
+  if (!bot) {
+    log('⚠️ 发送币种筛选菜单失败，bot 未初始化');
+    return;
+  }
+
+  const symbolArray = getCachedTopSymbols(); // 返回数组
+  if (!Array.isArray(symbolArray) || symbolArray.length === 0) {
+    await sendTelegramMessage('⚠️ 当前无可用的缓存币种');
+    return;
+  }
+
+  const rows = [];
+
+  for (let i = 0; i < symbolArray.length; i += 2) {
+    const row = [];
+
+    for (let j = 0; j < 2; j++) {
+      const symbol = symbolArray[i + j];
+      if (!symbol) continue;
+
+      row.push({
+        text: `🗑 ${symbol}`,
+        callback_data: `delete_symbol_${symbol}`
+      });
+    }
+
+    if (row.length) rows.push(row);
+  }
+
+  await bot.sendMessage(config.telegram.chatId, '🧹 当前策略币种（点击删除）', {
+    reply_markup: { inline_keyboard: rows }
   });
 }
 
@@ -249,7 +292,15 @@ async function handleCommand(data, chatId) {
     setOrderMode('amount');
     sendTelegramMessage('💵 已切换为固定金额下单模式');
     await sendMainMenu(); // 刷新按钮状态
+  } else if (data === 'show_symbol_list') {
+    await sendSymbolFilterMenu();
+    sendTelegramMessage('📋 查看策略币种列表');
+  } else if (data.startsWith('delete_symbol_')) {
+    const symbol = data.replace('delete_symbol_', '');
+    removeFromTopSymbols(symbol)
+    await sendTelegramMessage(`✅ 已从策略列表中移除：${symbol}`);
   }
+
 }
 
 module.exports = {

@@ -64,6 +64,41 @@ const getCachedTopSymbols = () => {
   return JSON.parse(fs.readFileSync(config.cachePaths.top50));
 };
 
+// 添加币种到 top50 缓存 addToTopSymbols('WIFUSDT');
+
+function addToTopSymbols(symbol) {
+  const filePath = config.cachePaths.top50;
+  let topSymbols = [];
+
+  if (fs.existsSync(filePath)) {
+    topSymbols = JSON.parse(fs.readFileSync(filePath));
+  }
+
+  if (!topSymbols.includes(symbol)) {
+    topSymbols.push(symbol);
+    fs.writeFileSync(filePath, JSON.stringify(topSymbols, null, 2));
+    log(`✅ 已添加 ${symbol} 到 topSymbols`);
+  } else {
+    log(`ℹ️ ${symbol} 已存在于 topSymbols`);
+  }
+}
+
+// 从 top50 缓存中移除币种 removeFromTopSymbols('DOGEUSDT');
+function removeFromTopSymbols(symbol) {
+  const filePath = config.cachePaths.top50;
+  if (!fs.existsSync(filePath)) return;
+
+  let topSymbols = JSON.parse(fs.readFileSync(filePath));
+  const updated = topSymbols.filter(s => s !== symbol);
+
+  if (updated.length !== topSymbols.length) {
+    fs.writeFileSync(filePath, JSON.stringify(updated, null, 2));
+    log(`🗑️ 已移除 ${symbol} 从 topSymbols`);
+  } else {
+    log(`⚠️ ${symbol} 不存在于 topSymbols`);
+  }
+}
+
 // 获取某币种的精度信息
 const getSymbolPrecision = (symbol) => {
   if (!fs.existsSync(config.cachePaths.precision)) return null;
@@ -120,5 +155,7 @@ module.exports = {
   getSymbolPrecision,
   clearSelectedSymbol,
   cachePositionRatio,
-  getCachedPositionRatio
+  getCachedPositionRatio,
+  addToTopSymbols,
+  removeFromTopSymbols,
 };
