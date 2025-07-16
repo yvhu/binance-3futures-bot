@@ -10,7 +10,7 @@ const { removeFromTopSymbols, getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
 
 async function checkLossTradesAndFilter() {
-  log(`⚠️ 15min开始检查亏损持仓`);
+  await sendTelegramMessage(`⚠️ 15min开始检查亏损持仓`);
   try {
     const topSymbols = getCachedTopSymbols();
 
