@@ -28,7 +28,7 @@ async function checkLossTradesAndFilter() {
 
       // 统计15分钟内亏损的成交次数
       // 这里假设成交记录中有 realizedProfit 字段，负值代表亏损
-      const lossCount = trades.filter(t => t.realizedProfit < 0).length;
+      const lossCount = trades.filter(t => t.realizedPnl < 0).length;
 
       if (lossCount > 2) {
         log(`⚠️ ${symbol} 近15分钟亏损次数超过2次(${lossCount}次)，从策略币种列表移除`);
