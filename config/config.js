@@ -7,6 +7,9 @@ module.exports = {
   // 每次选取做多或做空的币种数量（Top N）
   selectionCount: 5,
 
+  // 波动率阈值，0.15% 实体视为低波动
+  volatilityExitThreshold: 0.002, 
+
   // 使用的杠杆倍数（10倍杠杆）
   leverage: 10,
 

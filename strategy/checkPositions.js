@@ -120,7 +120,23 @@ async function checkAndCloseLosingPositions() {
         }
       }
 
-      // === 条件④：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
+      // === 条件④：波动率持续收敛，认为行情熄火，止盈退出 ===
+      else if (pnlRate > 0) {
+        const lastN = 5;
+        const bodies = klines.slice(-lastN).map(k => Math.abs(k.close - k.open));
+        const avgBodySize = bodies.reduce((a, b) => a + b, 0) / lastN;
+        const avgClosePrice = closePrices.slice(-lastN).reduce((a, b) => a + b, 0) / lastN;
+        const bodyRatio = avgBodySize / avgClosePrice;
+
+        const volatilityThreshold = config.volatilityExitThreshold || 0.0015; // 支持配置
+        if (bodyRatio < volatilityThreshold) {
+          shouldClose = true;
+          reason = '波动率过低，趋势可能结束';
+          log(`🔹 ${symbol} 收盘波动率压缩 (${(bodyRatio * 100).toFixed(3)}%)，触发止盈`);
+        }
+      }
+
+      // === 条件⑤：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
       else {
         const now = Date.now(); // 当前时间戳
         const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
