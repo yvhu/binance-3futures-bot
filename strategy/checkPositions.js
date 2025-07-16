@@ -139,7 +139,7 @@ async function checkAndCloseLosingPositions() {
       // === 条件⑤：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
       else {
         const now = Date.now(); // 当前时间戳
-        const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
+        const heldMinutes = (now - entryTime) / 30000; // 持仓持续的分钟数
 
         if (heldMinutes > config.minHoldingMinutes && pnlRate < config.minProfitRate) {
           shouldClose = true;
