@@ -10,7 +10,8 @@ const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
 const { getOrderMode } = require('../utils/state');
 // === 止损参数配置 ===
-const { enableStopLoss, stopLossRate } = config.riskControl;
+const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
+
 
 // Binance 合约API基础地址，从配置读取
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
@@ -246,6 +247,35 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
       log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
       sendTelegramMessage(`📉 已挂止损单：${symbol} 方向: ${stopSide}，触发价: ${stopPrice}`);
     }
+
+    // === 如果是开仓，挂止盈单（盈利10%止盈） ===
+    if (!positionAmt && enableTakeProfit) {
+      const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
+      const takeProfitPrice = side === 'BUY'
+        ? (price * (1 + takeProfitRate)).toFixed(precision.pricePrecision)
+        : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
+
+      const tpParams = new URLSearchParams({
+        symbol,
+        side: takeProfitSide,
+        type: 'TAKE_PROFIT_MARKET',
+        stopPrice: takeProfitPrice,   // 虽然叫 stopPrice，其实这里是触发价
+        closePosition: 'true',
+        timestamp: Date.now().toString()
+      });
+
+      const tpSignature = crypto
+        .createHmac('sha256', config.binance.apiSecret)
+        .update(tpParams.toString())
+        .digest('hex');
+
+      const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
+      const tpRes = await proxyPost(tpUrl, null, { headers });
+
+      log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
+      sendTelegramMessage(`💰 已挂止盈单：${symbol} 方向: ${takeProfitSide}，触发价: ${takeProfitPrice}`);
+    }
+
 
     return res.data;
 
