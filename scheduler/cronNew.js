@@ -10,6 +10,7 @@ const { removeFromTopSymbols, getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
 
 async function checkLossTradesAndFilter() {
+  log(`⚠️ 15min开始检查亏损持仓`);
   try {
     const topSymbols = getCachedTopSymbols();
 
@@ -67,6 +68,7 @@ async function startSchedulerNew() {
 
       log('⏱ 执行定时策略轮询...');
       const topSymbols = getCachedTopSymbols();
+      await sendTelegramMessage(`⚠️ 参与轮询的数量${topSymbols.length}`);
       log(`✅ 获取T50缓存数据`);
       const { topLong, topShort } = await getTopLongShortSymbols(topSymbols, 1); // 获取前1多空币种
       if (topLong.length > 0) {
