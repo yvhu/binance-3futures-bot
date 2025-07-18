@@ -18,7 +18,7 @@ module.exports = {
     enableStopLoss: true,         // 是否启用止损单
     stopLossRate: 0.003,           // 止损触发比例（亏损 2% = 0.02）
     enableTakeProfit: true,      // 是否启用止盈单（预留）
-    takeProfitRate: 0.002           // 止盈触发比例（盈利 10% = 0.1）
+    takeProfitRate: 0.005           // 止盈触发比例（盈利 10% = 0.1）
   },
 
   // 横盘逻辑配置
