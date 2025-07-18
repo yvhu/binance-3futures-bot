@@ -87,18 +87,28 @@ async function startSchedulerNew() {
       const { topLong, topShort } = await getTopLongShortSymbols(topSymbols, 1); // 获取前1多空币种
       if (topLong.length > 0) {
         for (const long of topLong) {
-          log(`✅ 开始下单`);
-          await placeOrder(long.symbol, 'BUY');
-          log(`✅ 做多 ${long.symbol}，信号分数 ${long.score}`);
+          try {
+            log(`✅ 开始做多下单 ${long.symbol}`);
+            await placeOrder(long.symbol, 'BUY');
+            log(`✅ 做多 ${long.symbol}，信号分数 ${long.score}`);
+          } catch (err) {
+            log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
+          }
         }
       }
+
       if (topShort.length > 0) {
         for (const short of topShort) {
-          log(`✅ 开始下单`);
-          await placeOrder(short.symbol, 'SELL');
-          log(`✅ 做空 ${short.symbol}，信号分数 ${short.score}`);
+          try {
+            log(`✅ 开始做空下单 ${short.symbol}`);
+            await placeOrder(short.symbol, 'SELL');
+            log(`✅ 做空 ${short.symbol}，信号分数 ${short.score}`);
+          } catch (err) {
+            log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
+          }
         }
       }
+
     }
   });
 

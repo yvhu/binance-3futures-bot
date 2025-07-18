@@ -15,7 +15,11 @@ const logs = db.log.list(5);
 console.log('最近日志：', logs);
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ 未捕获的 Promise 异常：', reason);
+  console.error('❌ 未处理的 Promise 拒绝：', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ 未捕获的异常：', err);
 });
 
 const { getStrategyType } = require('./utils/strategy');
