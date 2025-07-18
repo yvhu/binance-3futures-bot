@@ -18,6 +18,20 @@ async function checkLossTradesAndFilter() {
     const now = Date.now();
     const fifteenMinutesAgo = now - 15 * 60 * 1000;
 
+    // 创建 Date 对象
+    const currentDate = new Date(now);
+    const pastDate = new Date(fifteenMinutesAgo);
+
+    // 格式化为 YYYY-MM-DD
+    const formatDate = (date) => date.toISOString().split('T')[0];
+
+    const currentFormatted = formatDate(currentDate);
+    const pastFormatted = formatDate(pastDate);
+
+    console.log('当前时间:', currentFormatted);      // 例如: "2025-07-18"
+    console.log('15分钟前:', pastFormatted);        // 例如: "2025-07-18"
+    await sendTelegramMessage(`开始检查亏损持仓： 🧯 ${pastFormatted} --- ${currentFormatted}`);
+
     for (const symbol of topSymbols) {
       // 获取该symbol最近15分钟内的成交记录
       const trades = await getAccountTrades(symbol, { startTime: fifteenMinutesAgo, endTime: now });

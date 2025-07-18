@@ -5,6 +5,14 @@ const { startSchedulerNew } = require('./scheduler/cronNew');
 const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
+const db = require('./db');
+
+db.initTables(); // 初始化所有表结构
+
+// 示例使用日志模块
+db.log.insert('INFO', '策略启动完成');
+const logs = db.log.list(5);
+console.log('最近日志：', logs);
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未捕获的 Promise 异常：', reason);

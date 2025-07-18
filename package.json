@@ -10,6 +10,7 @@
   "dependencies": {
     "axios": "^1.6.7",
     "axios-retry": "^3.6.0",
+    "better-sqlite3": "^12.2.0",
     "dotenv": "^16.4.5",
     "https-proxy-agent": "^7.0.2",
     "moment-timezone": "^0.6.0",
