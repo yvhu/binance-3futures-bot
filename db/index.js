@@ -7,9 +7,7 @@ const DB_PATH = path.resolve(__dirname, '../data');
 if (!fs.existsSync(DB_PATH)) fs.mkdirSync(DB_PATH);
 
 // 单例数据库连接
-const db = new Database(path.join(DB_PATH, 'database.sqlite'), {
-  verbose: false, // 设置为 console.log 可调试 SQL
-});
+const db = new Database(path.join(DB_PATH, 'database.sqlite')); // 不写 verbose 即可
 
 // 引入子模块初始化函数
 const log = require('./log');
