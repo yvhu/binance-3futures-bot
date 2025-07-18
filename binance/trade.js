@@ -434,8 +434,34 @@ async function getAccountTrades(symbol, startTime = 0) {
   }
 }
 
+/**
+ * 获取某个合约币种在指定时间段的亏损平仓记录
+ * @param {string} symbol - 合约币种，例如 BTCUSDT
+ * @param {number} startTime - 开始时间戳（毫秒）
+ * @param {number} endTime - 结束时间戳（毫秒）
+ * @returns {Promise<Array>} 亏损平仓记录数组
+ */
+async function getLossIncomes(symbol, startTime, endTime) {
+  try {
+    const res = await proxyGet('/fapi/v1/income', {
+      symbol,
+      incomeType: 'REALIZED_PNL',
+      startTime,
+      endTime,
+      limit: 100,
+    });
+
+    // 返回亏损记录（income < 0）
+    return res.filter(item => parseFloat(item.income) < 0);
+  } catch (err) {
+    console.error(`❌ 获取 ${symbol} 收益记录失败: ${err.message}`);
+    return [];
+  }
+}
+
 module.exports = {
   placeOrder,
   closePositionIfNeeded,
-  getAccountTrades
+  getAccountTrades,
+  getLossIncomes
 };

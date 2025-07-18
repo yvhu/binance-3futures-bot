@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
-const { placeOrder } = require('../binance/trade');
+const { placeOrder, getLossIncomes } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
@@ -18,62 +18,47 @@ async function checkLossTradesAndFilter() {
     const now = Date.now();
     const fifteenMinutesAgo = now - 15 * 60 * 1000;
 
-    // 创建 Date 对象
-    const currentDate = new Date(now);
-    const pastDate = new Date(fifteenMinutesAgo);
-
     // 格式化为 YYYY-MM-DD HH:mm:ss
     const formatFullDateTime = (date) => {
       const pad = (n) => String(n).padStart(2, '0');
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     };
 
-    const currentFormatted = formatFullDateTime(currentDate);
-    const pastFormatted = formatFullDateTime(pastDate);
+    const currentFormatted = formatFullDateTime(new Date(now));
+    const pastFormatted = formatFullDateTime(new Date(fifteenMinutesAgo));
 
-    console.log('当前时间:', currentFormatted);
-    console.log('15分钟前:', pastFormatted);
-    await sendTelegramMessage(`开始检查亏损持仓：🧯 ${pastFormatted} --- ${currentFormatted}`);
-
+    log(`检查时间范围: ${pastFormatted} --- ${currentFormatted}`);
+    await sendTelegramMessage(`🧯 检查时间范围：${pastFormatted} --- ${currentFormatted}`);
 
     for (const symbol of topSymbols) {
-      // 获取该symbol最近15分钟内的成交记录
-      const trades = await getAccountTrades(symbol, { startTime: fifteenMinutesAgo, endTime: now });
-      if (!Array.isArray(trades)) {
-        log(`❌ 获取 ${symbol} 交易记录失败或返回格式错误`);
-        continue;
-      }
+      // 获取该 symbol 在15分钟内的亏损平仓记录
+      const lossIncomes = await getLossIncomes(symbol, fifteenMinutesAgo, now);
 
-      // 统计15分钟内亏损的成交次数
-      // 这里假设成交记录中有 realizedProfit 字段，负值代表亏损
-      const lossCount = trades.filter(t => t.realizedPnl < 0).length;
+      if (lossIncomes.length > 2) {
+        log(`⚠️ ${symbol} 近15分钟亏损平仓次数 ${lossIncomes.length} 次，移出策略币种`);
 
-      if (lossCount > 2) {
-        log(`⚠️ ${symbol} 近15分钟亏损次数超过2次(${lossCount}次)，从策略币种列表移除`);
-
-        // 🔍 检查是否有持仓，如有则立即平仓
+        // 检查是否有持仓，有则立即平仓
         const position = getPosition(symbol);
-        if (position) {
+        if (position && position.positionAmt && Math.abs(position.positionAmt) > 0) {
           const oppositeSide = position.side === 'BUY' ? 'SELL' : 'BUY';
           try {
-            await placeOrder(symbol, oppositeSide, position.positionAmt); // 使用平仓数量
+            await placeOrder(symbol, oppositeSide, Math.abs(position.positionAmt));
             log(`🧯 ${symbol} 已因连续亏损自动平仓`);
-            await sendTelegramMessage(`🧯 ${symbol} 由于连续亏损，持仓已被自动平仓`);
+            await sendTelegramMessage(`🧯 ${symbol} 因连续亏损已平仓`);
           } catch (err) {
-            log(`❌ 平仓 ${symbol} 失败：`, err.message);
+            log(`❌ 平仓 ${symbol} 失败: ${err.message}`);
             await sendTelegramMessage(`❌ 平仓 ${symbol} 失败，原因: ${err.message}`);
           }
         }
 
-        // 🚫 从策略币种中移除
+        // 移除策略缓存
         removeFromTopSymbols(symbol);
-
-        // 发送Telegram通知
-        await sendTelegramMessage(`⚠️ 策略币种筛选：${symbol} 近15分钟亏损次数达到 ${lossCount} 次，已自动从策略币种列表移除。`);
+        await sendTelegramMessage(`⚠️ ${symbol} 连续亏损已从策略池中移除`);
       }
     }
   } catch (err) {
-    log('❌ 检查交易亏损失败:', err);
+    log(`❌ checkLossTradesAndFilter 执行异常: ${err.stack}`);
+    await sendTelegramMessage(`❌ 检查亏损持仓异常：${err.message}`);
   }
 }
 
