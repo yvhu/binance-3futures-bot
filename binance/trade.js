@@ -443,18 +443,37 @@ async function getAccountTrades(symbol, startTime = 0) {
  */
 async function getLossIncomes(symbol, startTime, endTime) {
   try {
-    const res = await proxyGet('/fapi/v1/income', {
+    const timestamp = Date.now();
+
+    const params = new URLSearchParams({
       symbol,
       incomeType: 'REALIZED_PNL',
-      startTime,
-      endTime,
-      limit: 100,
+      startTime: startTime.toString(),
+      endTime: endTime.toString(),
+      limit: '100',
+      timestamp: timestamp.toString(),
     });
 
-    // 返回亏损记录（income < 0）
-    return res.filter(item => parseFloat(item.income) < 0);
-  } catch (err) {
-    console.error(`❌ 获取 ${symbol} 收益记录失败: ${err.message}`);
+    const signature = crypto
+      .createHmac('sha256', config.binance.apiSecret)
+      .update(params.toString())
+      .digest('hex');
+
+    const url = `${BINANCE_API}/fapi/v1/income?${params.toString()}&signature=${signature}`;
+    const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
+    const res = await proxyGet(url, { headers });
+
+    if (!Array.isArray(res.data)) {
+      log(`❌ ${symbol} 收益记录格式异常`);
+      return [];
+    }
+
+    // 筛选出亏损的记录（income < 0）
+    return res.data.filter(item => parseFloat(item.income) < 0);
+  } catch (error) {
+    log(`❌ 获取 ${symbol} 收益记录失败:`, error.response?.data || error.message);
+    await sendTelegramMessage(`❌ 获取 ${symbol} 收益记录失败，请检查API权限或网络`);
     return [];
   }
 }
