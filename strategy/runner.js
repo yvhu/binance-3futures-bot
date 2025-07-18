@@ -23,15 +23,25 @@ async function runStrategyCycle() {
   try {
     const result = await analyzeSymbol(symbol, config.interval);
 
-    if (result.shouldLong) {
+    if (result.shouldShort) {
       log(`📈 ${symbol} 检测到做多信号`);
       await placeOrder(symbol, 'BUY');
-    } else if (result.shouldShort) {
+    } else if (result.shouldLong) {
       log(`📉 ${symbol} 检测到做空信号`);
       await placeOrder(symbol, 'SELL');
     } else {
       log(`🔍 ${symbol} 当前无明确入场信号`);
     }
+    
+    // if (result.shouldLong) {
+    //   log(`📈 ${symbol} 检测到做多信号`);
+    //   await placeOrder(symbol, 'BUY');
+    // } else if (result.shouldShortshouldLong) {
+    //   log(`📉 ${symbol} 检测到做空信号`);
+    //   await placeOrder(symbol, 'SELL');
+    // } else {
+    //   log(`🔍 ${symbol} 当前无明确入场信号`);
+    // }
   } catch (err) {
     log(`❌ 分析信号失败：${err.message}`);
   }
