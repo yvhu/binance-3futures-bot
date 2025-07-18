@@ -22,6 +22,7 @@ const { sendTelegramMessage } = require('./messenger');
 const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils/strategy');
 const { cachePositionRatio, getCachedPositionRatio, getCachedTopSymbols, removeFromTopSymbols } = require('../utils/cache');
 const { setOrderMode, getOrderMode } = require('../utils/state');
+const { getSignalMode, toggleSignalMode } = require('../utils/tg-settings')
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
@@ -88,6 +89,7 @@ async function sendMainMenu() {
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
+    [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }],
   ];
 
   const ratioButtons = [
@@ -229,6 +231,7 @@ async function handleCommand(data, chatId) {
         `- 最新下单比例：${cachedRatio * 100}%`
       ] : []),
       `- 策略类型：${strategyType}`,
+      `- 当前策略模式：${getSignalMode() == 'NEGATE' ? '取反' : '取正'}`
       `-下单状态：${orderMode === 'ratio' ? '按比例下单' : '固定金额下单'}`
     ];
 
@@ -300,6 +303,9 @@ async function handleCommand(data, chatId) {
     const symbol = data.replace('delete_symbol_', '');
     removeFromTopSymbols(symbol)
     await sendTelegramMessage(`✅ 已从策略列表中移除：${symbol}`);
+  } else if (data === 'toggle_signal_mode') {
+    const newMode = toggleSignalMode();
+    await sendTelegramMessage(`✅ 当前信号模式为：${newMode == 'NEGATE' ? '取反' : '取正'}`);
   }
 
 }
