@@ -231,7 +231,7 @@ async function handleCommand(data, chatId) {
         `- 最新下单比例：${cachedRatio * 100}%`
       ] : []),
       `- 策略类型：${strategyType}`,
-      `- 当前策略模式：${getSignalMode() == 'NEGATE' ? '取反' : '取正'}`
+      `- 当前策略模式：${getSignalMode() == 'NEGATE' ? '取反' : '取正'}`,
       `-下单状态：${orderMode === 'ratio' ? '按比例下单' : '固定金额下单'}`
     ];
 
