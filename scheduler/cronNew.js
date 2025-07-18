@@ -22,15 +22,19 @@ async function checkLossTradesAndFilter() {
     const currentDate = new Date(now);
     const pastDate = new Date(fifteenMinutesAgo);
 
-    // 格式化为 YYYY-MM-DD
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    // 格式化为 YYYY-MM-DD HH:mm:ss
+    const formatFullDateTime = (date) => {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    };
 
-    const currentFormatted = formatDate(currentDate);
-    const pastFormatted = formatDate(pastDate);
+    const currentFormatted = formatFullDateTime(currentDate);
+    const pastFormatted = formatFullDateTime(pastDate);
 
-    console.log('当前时间:', currentFormatted);      // 例如: "2025-07-18"
-    console.log('15分钟前:', pastFormatted);        // 例如: "2025-07-18"
-    await sendTelegramMessage(`开始检查亏损持仓： 🧯 ${pastFormatted} --- ${currentFormatted}`);
+    console.log('当前时间:', currentFormatted);
+    console.log('15分钟前:', pastFormatted);
+    await sendTelegramMessage(`开始检查亏损持仓：🧯 ${pastFormatted} --- ${currentFormatted}`);
+
 
     for (const symbol of topSymbols) {
       // 获取该symbol最近15分钟内的成交记录
