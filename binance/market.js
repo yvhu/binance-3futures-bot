@@ -9,18 +9,55 @@ async function getTopSymbols() {
   return response.data;
 }
 
-// ✅ 获取 K 线数据（用于指标分析）
+/**
+ * 获取币安K线数据
+ * @param {string} symbol 交易对符号 (如: BTCUSDT)
+ * @param {string} [interval='3m'] K线间隔 (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M)
+ * @param {number} [limit=50] 返回的数据条数
+ * @returns {Promise<Array<{
+ *   openTime: number,
+ *   open: number,
+ *   high: number,
+ *   low: number,
+ *   close: number,
+ *   volume: number,
+ *   closeTime: number,
+ *   quoteVolume: number,
+ *   trades: number,
+ *   takerBuyBaseVolume: number,
+ *   takerBuyQuoteVolume: number,
+ *   ignore: number
+ * }>>}
+ * @throws {Error} 当请求失败时抛出错误
+ */
 async function getKlines(symbol, interval = '3m', limit = 50) {
-  const url = `${BINANCE_API}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const response = await proxyGet(url);
-  return response.data.map(k => ({
-    openTime: k[0],
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5])
-  }));
+  try {
+    const url = `${BINANCE_API}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const response = await proxyGet(url);
+    
+    if (!response.data || !Array.isArray(response.data)) {
+      throw new Error('Invalid response data format');
+    }
+
+    return response.data.map(k => ({
+      openTime: k[0],                    // 开盘时间
+      open: parseFloat(k[1]),            // 开盘价
+      high: parseFloat(k[2]),            // 最高价
+      low: parseFloat(k[3]),             // 最低价
+      close: parseFloat(k[4]),           // 收盘价
+      volume: parseFloat(k[5]),          // 成交量
+      closeTime: k[6],                   // 收盘时间
+      quoteVolume: parseFloat(k[7]),     // 成交额
+      trades: k[8],                      // 成交笔数
+      takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
+      takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
+      ignore: parseFloat(k[11])          // 忽略字段
+    }));
+    
+  } catch (error) {
+    console.error(`Failed to fetch klines for ${symbol}:`, error);
+    throw new Error(`Failed to fetch kline data: ${error.message}`);
+  }
 }
 
 /**

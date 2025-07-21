@@ -18,7 +18,7 @@ const cacheTopSymbols = async () => {
 
   const sorted = tickerRes.data
     .filter(item => item.symbol.endsWith('USDT') && !item.symbol.includes('_'))
-    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
+    .sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume));
 
   const top50 = sorted.slice(0, 50).map(i => i.symbol);
   fs.writeFileSync(config.cachePaths.top50, JSON.stringify(top50, null, 2));
