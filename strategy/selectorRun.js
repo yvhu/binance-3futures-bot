@@ -30,15 +30,15 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   if (!klines || klines.length < 50) return null;
 
-  // const close = klines.map(k => parseFloat(k[4])).filter(x => !isNaN(x));
+  // 提取价格和成交量数据
   const close = klines.map(k => k.close);
   const high = klines.map(k => k.high);
   const low = klines.map(k => k.low);
   const volume = klines.map(k => k.volume);
-
+  const avgVolume = volume.slice(-20).reduce((a, b) => a + b, 0) / 20;
 
   // ========== 横盘震荡过滤 ==========
-  const flat = isFlatMarket({ close, high, low }, 0.005, 0.01); // 参数可调
+  const flat = isFlatMarket({ close, high, low }, 0.005, 0.01);
   if (flat) {
     log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
@@ -48,15 +48,14 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const ema13 = EMA.calculate({ period: 13, values: close });
   const boll = BollingerBands.calculate({ period: 20, values: close });
   const vwap = getVWAP(close, high, low, volume);
+  const atr = calculateATR(klines, 14);
 
   // 对齐所有指标长度
-  const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length);
-
-  if (ema5.length < 1 || ema13.length < 1 || boll.length < 2 || vwap.length < 1) {
-    log(`❌ ${symbol} 指标长度不足: ema5=${ema5.length}, ema13=${ema13.length}, boll=${boll.length}, vwap=${vwap.length}`);
+  const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length, atr.length);
+  if (minLength < 2) {
+    log(`❌ ${symbol} 指标长度不足`);
     return null;
   }
-
 
   const offset = close.length - minLength;
   const alignedClose = close.slice(offset);
@@ -64,34 +63,71 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const alignedEma13 = ema13.slice(-minLength);
   const alignedVWAP = vwap.slice(-minLength);
   const alignedBoll = boll.slice(-minLength);
+  const alignedATR = atr.slice(-minLength);
+  const alignedVolume = volume.slice(offset);
 
-  // 使用最后一根作为判断依据
+  // 获取最新值
   const lastClose = alignedClose[minLength - 1];
   const prevClose = alignedClose[minLength - 2];
-
   const lastEma5 = alignedEma5[minLength - 1];
   const lastEma13 = alignedEma13[minLength - 1];
-
   const lastVWAP = alignedVWAP[minLength - 1];
-
   const lastBoll = alignedBoll[minLength - 1];
-  const prevBoll = alignedBoll[minLength - 2];
+  const lastATR = alignedATR[minLength - 1];
+  const lastVolume = alignedVolume[minLength - 1];
+  const atrPercent = lastATR / lastClose;
 
-  // ========== 打分逻辑 ==========
+  // ========== 趋势确认函数 ==========
+  const trendConfirmation = (values, period) => {
+    const changes = [];
+    for (let i = 1; i <= period; i++) {
+      changes.push(values[values.length - i] > values[values.length - i - 1]);
+    }
+    return changes.filter(x => x).length >= period * 0.7;
+  };
+
+  const uptrendConfirmed = trendConfirmation(alignedClose, 5);
+  const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
+
+  // ========== 波动性和成交量过滤 ==========
+  if (atrPercent < 0.005) {
+    log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
+    return null;
+  }
+
+  if (lastVolume < avgVolume * 0.8) {
+    log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume})`);
+    return null;
+  }
+
+  // ========== 时间过滤 ==========
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  
+  if ((hours === 4 && minutes >= 30) || (hours >= 16 && hours < 18)) {
+    log(`🚫 ${symbol} 当前时段流动性不足`);
+    return null;
+  }
+
+  // ========== 改进后的打分逻辑 ==========
   let longScore = 0;
   let shortScore = 0;
 
-  if (lastClose > lastVWAP) longScore++;
-  if (lastEma5 > lastEma13) longScore++;
-  if (lastClose > lastBoll.middle) longScore++;
-  if (lastClose > lastBoll.upper) longScore++;
-  if (lastEma5 - lastEma13 > 0.05) longScore++;
+  // 基础条件
+  if (lastClose > lastVWAP) longScore += 0.5;
+  if (lastEma5 > lastEma13) longScore += 0.5;
+  if (lastClose > lastBoll.middle) longScore += 0.5;
 
-  if (lastClose < lastVWAP) shortScore++;
-  if (lastEma5 < lastEma13) shortScore++;
-  if (lastClose < lastBoll.middle) shortScore++;
-  if (lastClose < lastBoll.lower) shortScore++;
-  if (lastEma13 - lastEma5 > 0.05) shortScore++;
+  if (lastClose < lastVWAP) shortScore += 0.5;
+  if (lastEma5 < lastEma13) shortScore += 0.5;
+  if (lastClose < lastBoll.middle) shortScore += 0.5;
+
+  // 强势条件(权重更高)
+  if (lastClose > lastBoll.upper && lastVolume > avgVolume * 1.5) longScore += 2;
+  if (lastClose < lastBoll.lower && lastVolume > avgVolume * 1.5) shortScore += 2;
+  if (lastEma5 - lastEma13 > 0.05 && uptrendConfirmed) longScore += 1;
+  if (lastEma13 - lastEma5 > 0.05 && downtrendConfirmed) shortScore += 1;
 
   // ========== 最终信号选择 ==========
   const threshold = 3;
@@ -106,11 +142,54 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     score = shortScore;
   }
 
-  // log(`✅ ${symbol}: side=${signal}, longScore=${longScore}, shortScore=${shortScore}`);
-  // log(`${symbol} → close=${lastClose.toFixed(4)}, ema5=${lastEma5.toFixed(4)}, ema13=${lastEma13.toFixed(4)}, vwap=${lastVWAP.toFixed(4)}`);
-
   if (!signal) return null;
-  return { symbol, side: signal, score };
+
+  // 记录详细信息
+  log(`✅ ${symbol}: ${signal} (得分: ${score})`);
+  log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
+  log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
+  log(`  成交量: ${lastVolume.toFixed(2)} (平均: ${avgVolume.toFixed(2)}) | ATR: ${lastATR.toFixed(4)} (${(atrPercent*100).toFixed(2)}%)`);
+
+  return { 
+    symbol, 
+    side: signal, 
+    score,
+    price: lastClose,
+    indicators: {
+      ema5: lastEma5,
+      ema13: lastEma13,
+      vwap: lastVWAP,
+      bollinger: lastBoll,
+      atr: lastATR,
+      volume: lastVolume,
+      avgVolume
+    }
+  };
+}
+
+// ========== 辅助函数 ==========
+function calculateATR(klines, period = 14) {
+  const highs = klines.map(k => k.high);
+  const lows = klines.map(k => k.low);
+  const closes = klines.map(k => k.close);
+  
+  const tr = [];
+  for (let i = 1; i < closes.length; i++) {
+    const hl = highs[i] - lows[i];
+    const hc = Math.abs(highs[i] - closes[i-1]);
+    const lc = Math.abs(lows[i] - closes[i-1]);
+    tr.push(Math.max(hl, hc, lc));
+  }
+  
+  const atr = new Array(period).fill(NaN);
+  let sum = tr.slice(0, period).reduce((a, b) => a + b, 0);
+  atr.push(sum / period);
+  
+  for (let i = period + 1; i < closes.length; i++) {
+    atr.push((atr[i-1] * (period - 1) + tr[i-1]) / period);
+  }
+  
+  return atr;
 }
 
 // 遍历多个币种，返回 topN 的多头和空头
@@ -121,7 +200,7 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
   for (const symbol of symbolList) {
     try {
       // log(`✅ ${symbol} 开始校验:`);
-      const res = await evaluateSymbolWithScore(symbol);
+      const res = await evaluateSymbolWithScore(symbol, config.interval);
       if (!res) continue;
       if (res?.side === 'LONG') longList.push(res);
       if (res?.side === 'SHORT') shortList.push(res);
