@@ -16,7 +16,7 @@ module.exports = {
   // 止盈止损配置
   riskControl: {
     enableStopLoss: true,         // 是否启用止损单
-    stopLossRate: 0.002,           // 止损触发比例（亏损 2% = 0.02）
+    stopLossRate: 0.003,           // 止损触发比例（亏损 2% = 0.02）
     enableTakeProfit: true,      // 是否启用止盈单（预留）
     takeProfitRate: 0.003           // 止盈触发比例（盈利 10% = 0.1）
   },
