@@ -287,14 +287,6 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 }
 
 /**
- * 判断是否需要自动平仓（根据持仓时间）
- * 超过配置时间则强制平仓
- * @param {string} symbol 交易对
- */
-/**
- * 检查是否需要超时平仓，如果超过 maxPositionMinutes 则自动平掉
- */
-/**
  * 根据持仓情况判断是否需要平仓
  * 条件：
  *  1. 持仓时间超过配置的最大持仓时间

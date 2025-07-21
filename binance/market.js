@@ -1,3 +1,5 @@
+// 非严格header接口
+
 const config = require('../config/config');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
