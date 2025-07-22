@@ -36,7 +36,7 @@ const cacheTopSymbols = async () => {
       perpetualSymbols.includes(item.symbol) && // 只保留永续合约
       !item.symbol.includes('_')               // 排除带有_的合约（如BTCUSDT_2406）
     )
-    .sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume));
+    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
 
   log(`✅ 全部永续合约数据：${JSON.stringify(sorted.map(item => item.symbol), null, 2)}`);
   
