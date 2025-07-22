@@ -164,7 +164,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const threshold = 3;
   let signal = null;
   let score = 0;
-
+  log(`✅ ${symbol}: (得分: longScore-${longScore} shortScore-${shortScore})`);
   if (longScore >= threshold && longScore >= shortScore) {
     signal = 'LONG';
     score = longScore;
