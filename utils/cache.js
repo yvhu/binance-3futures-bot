@@ -19,7 +19,7 @@ const cacheTopSymbols = async () => {
   const sorted = tickerRes.data
     .filter(item => item.symbol.endsWith('USDT') && !item.symbol.includes('_'))
     .sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume));
-
+  log(`✅ 全部币种数据：${sorted} `);
   const top50 = sorted.slice(0, 50).map(i => i.symbol);
   fs.writeFileSync(config.cachePaths.top50, JSON.stringify(top50, null, 2));
   log(`✅ 缓存 Top50 币种：${top50.length} 个`);
