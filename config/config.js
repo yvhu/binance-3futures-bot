@@ -95,7 +95,7 @@ module.exports = {
   // 亏损超过 -50% 平仓
   lossThreshold: -0.5,
 
-  // 基础阈值
+  // 基础阈值Rat
   baseRatio: 0.003,
 
   // Telegram 配置
