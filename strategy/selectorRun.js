@@ -37,7 +37,18 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const high = klines.map(k => k.high);
   const low = klines.map(k => k.low);
   const volume = klines.map(k => k.volume);
-  const avgVolume = volume.slice(-20).reduce((a, b) => a + b, 0) / 20;
+
+  // ========== 改进的成交量计算 ==========
+  const volumePeriod = 50; // 使用更长周期计算平均成交量
+  const avgVolume = volume.slice(-volumePeriod).reduce((a, b) => a + b, 0) / volumePeriod;
+  
+  // 计算成交量EMA和标准差
+  const volumeEMA = EMA.calculate({ period: 20, values: volume });
+  const lastVolumeEMA = volumeEMA[volumeEMA.length - 1];
+  
+  const volumeStdDev = Math.sqrt(
+    volume.slice(-volumePeriod).reduce((sum, vol) => sum + Math.pow(vol - avgVolume, 2), 0) / volumePeriod
+  );
 
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
@@ -47,7 +58,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const atr = calculateATR(klines, 14);
 
   // 对齐所有指标长度
-  const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length, atr.length);
+  const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length, atr.length, volumeEMA.length);
   if (minLength < 2) {
     log(`❌ ${symbol} 指标长度不足`);
     return null;
@@ -61,6 +72,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const alignedBoll = boll.slice(-minLength);
   const alignedATR = atr.slice(-minLength);
   const alignedVolume = volume.slice(offset);
+  const alignedVolumeEMA = volumeEMA.slice(-minLength);
 
   // 获取最新值
   const lastClose = alignedClose[minLength - 1];
@@ -71,10 +83,24 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const lastBoll = alignedBoll[minLength - 1];
   const lastATR = alignedATR[minLength - 1];
   const lastVolume = alignedVolume[minLength - 1];
+  const lastVolumeEMAValue = alignedVolumeEMA[minLength - 1];
   const atrPercent = lastATR / lastClose;
 
   const currentPrice = await getCurrentPrice(symbol);
   const baseRatio = dynamicPriceRangeRatio(currentPrice, atr, config.baseRatio);
+
+  // ========== 改进的成交量判断 ==========
+  const volumeRatio = lastVolume / avgVolume;
+  const volumeEMARatio = lastVolume / lastVolumeEMAValue;
+  const isVolumeSpike = (volumeRatio > 1.2 || volumeEMARatio > 1.2) && 
+                        lastVolume > avgVolume + 2 * volumeStdDev;
+  const isVolumeDecline = (volumeRatio < 0.8 || volumeEMARatio < 0.8) && 
+                          lastVolume < avgVolume - 2 * volumeStdDev;
+
+  // 成交量趋势判断
+  const volumeTrendUp = trendConfirmation(alignedVolume, 3);
+  const volumeTrendDown = trendConfirmation(alignedVolume.map(x => -x), 3);
+
   // ========== 横盘震荡过滤 ==========
   const flat = isFlatMarket({ close, high, low }, 0.005, baseRatio);
   if (flat) {
@@ -100,8 +126,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     return null;
   }
 
-  if (lastVolume < avgVolume * 0.6) {
-    log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume})`);
+  if (isVolumeDecline) {
+    log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
     return null;
   }
 
@@ -110,14 +136,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const hours = now.getHours();
   const minutes = now.getMinutes();
 
-  // if ((hours === 4 && minutes >= 30) || (hours >= 16 && hours < 18)) {
-  //   log(`🚫 ${symbol} 当前时段流动性不足`);
-  //   return null;
-  // }
-
-  // 针对亚洲活跃品种（如BTC/USDT）
   if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
-    // 跳过UTC时间1:00-3:00和12:30-13:00
     log(`🚫 ${symbol} 当前时段流动性不足`);
     return null;
   }
@@ -136,10 +155,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastClose < lastBoll.middle) shortScore += 0.5;
 
   // 强势条件(权重更高)
-  if (lastClose > lastBoll.upper && lastVolume > avgVolume * 1.5) longScore += 2;
-  if (lastClose < lastBoll.lower && lastVolume > avgVolume * 1.5) shortScore += 2;
-  if (lastEma5 - lastEma13 > 0.05 && uptrendConfirmed) longScore += 1;
-  if (lastEma13 - lastEma5 > 0.05 && downtrendConfirmed) shortScore += 1;
+  if (lastClose > lastBoll.upper && isVolumeSpike && volumeTrendUp) longScore += 2;
+  if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown) shortScore += 2;
+  if (lastEma5 - lastEma13 > 0.05 && uptrendConfirmed && volumeTrendUp) longScore += 1;
+  if (lastEma13 - lastEma5 > 0.05 && downtrendConfirmed && volumeTrendDown) shortScore += 1;
 
   // ========== 最终信号选择 ==========
   const threshold = 3;
@@ -160,7 +179,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   log(`✅ ${symbol}: ${signal} (得分: ${score})`);
   log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
   log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
-  log(`  成交量: ${lastVolume.toFixed(2)} (平均: ${avgVolume.toFixed(2)}) | ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%)`);
+  log(`  成交量: ${lastVolume.toFixed(2)} (平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
+  log(`  ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%) | 成交量趋势: ${volumeTrendUp ? '↑' : volumeTrendDown ? '↓' : '→'}`);
 
   return {
     symbol,
@@ -174,7 +194,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
       bollinger: lastBoll,
       atr: lastATR,
       volume: lastVolume,
-      avgVolume
+      avgVolume,
+      volumeEMA: lastVolumeEMAValue,
+      volumeStdDev,
+      volumeTrend: volumeTrendUp ? 'up' : volumeTrendDown ? 'down' : 'neutral'
     }
   };
 }
