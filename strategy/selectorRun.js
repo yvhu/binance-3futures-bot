@@ -100,7 +100,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     return null;
   }
 
-  if (lastVolume < avgVolume * 0.8) {
+  if (lastVolume < avgVolume * 0.6) {
     log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume})`);
     return null;
   }
