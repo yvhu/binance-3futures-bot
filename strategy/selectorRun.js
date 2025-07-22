@@ -95,7 +95,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
 
   // ========== 波动性和成交量过滤 ==========
-  if (atrPercent < 0.005) {
+  if (atrPercent < 0.003) {
     log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
     return null;
   }
@@ -110,7 +110,14 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const hours = now.getHours();
   const minutes = now.getMinutes();
 
-  if ((hours === 4 && minutes >= 30) || (hours >= 16 && hours < 18)) {
+  // if ((hours === 4 && minutes >= 30) || (hours >= 16 && hours < 18)) {
+  //   log(`🚫 ${symbol} 当前时段流动性不足`);
+  //   return null;
+  // }
+
+  // 针对亚洲活跃品种（如BTC/USDT）
+  if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
+    // 跳过UTC时间1:00-3:00和12:30-13:00
     log(`🚫 ${symbol} 当前时段流动性不足`);
     return null;
   }
