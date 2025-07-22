@@ -12,23 +12,41 @@ const ensureCacheDir = () => {
 // 缓存Top50 + 精度信息
 const cacheTopSymbols = async () => {
   ensureCacheDir();
-  // 获取币种24小时成交量排序
+  
+  // 1. 获取合约市场信息（确定哪些是永续合约）
+  const exchangeInfoUrl = config.binance.baseUrl + config.binance.endpoints.exchangeInfo;
+  const infoRes = await proxyGet(exchangeInfoUrl);
+  
+  // 提取所有USDT永续合约的symbol
+  const perpetualSymbols = infoRes.data.symbols
+    .filter(s => 
+      s.contractType === 'PERPETUAL' && // 永续合约
+      s.quoteAsset === 'USDT' &&       // USDT保证金
+      s.status === 'TRADING'           // 正在交易中
+    )
+    .map(s => s.symbol);
+
+  // 2. 获取24小时成交量数据
   const tickerUrl = config.binance.baseUrl + config.binance.endpoints.ticker24hr;
   const tickerRes = await proxyGet(tickerUrl);
 
+  // 3. 过滤永续合约 + 按成交量排序
   const sorted = tickerRes.data
-    .filter(item => item.symbol.endsWith('USDT') && !item.symbol.includes('_'))
+    .filter(item => 
+      perpetualSymbols.includes(item.symbol) && // 只保留永续合约
+      !item.symbol.includes('_')               // 排除带有_的合约（如BTCUSDT_2406）
+    )
     .sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume));
-  log(`✅ 全部币种数据：${JSON.stringify(sorted, null, 2)}`);
+
+  log(`✅ 全部永续合约数据：${JSON.stringify(sorted.map(item => item.symbol), null, 2)}`);
+  
+  // 4. 取前50名
   const top50 = sorted.slice(0, 50).map(i => i.symbol);
   fs.writeFileSync(config.cachePaths.top50, JSON.stringify(top50, null, 2));
-  log(`✅ 缓存 Top50 币种：${top50.length} 个`);
+  log(`✅ 缓存 Top50 USDT永续合约：${top50.length} 个`);
 
-  // 获取精度信息（来自 exchangeInfo）
-  const exchangeInfoUrl = config.binance.baseUrl + '/fapi/v1/exchangeInfo';
-  const infoRes = await proxyGet(exchangeInfoUrl);
+  // 5. 缓存精度信息（保持不变）
   const symbolPrecisions = {};
-
   top50.forEach(symbol => {
     const info = infoRes.data.symbols.find(s => s.symbol === symbol);
     if (info) {

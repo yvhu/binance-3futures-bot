@@ -117,7 +117,8 @@ module.exports = {
     endpoints: {
       ticker24hr: '/fapi/v1/ticker/24hr', // 获取24小时行情数据
       price: '/fapi/v1/ticker/price',     // 获取最新市价
-      klines: '/fapi/v1/klines'           // 获取K线数据
+      klines: '/fapi/v1/klines',           // 获取K线数据
+      exchangeInfo: '/fapi/v1/exchangeInfo',
     },
     // 控制是否启用代理
     useProxy: false,
