@@ -41,11 +41,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 改进的成交量计算 ==========
   const volumePeriod = 50; // 使用更长周期计算平均成交量
   const avgVolume = volume.slice(-volumePeriod).reduce((a, b) => a + b, 0) / volumePeriod;
-  
+
   // 计算成交量EMA和标准差
   const volumeEMA = EMA.calculate({ period: 20, values: volume });
   const lastVolumeEMA = volumeEMA[volumeEMA.length - 1];
-  
+
   const volumeStdDev = Math.sqrt(
     volume.slice(-volumePeriod).reduce((sum, vol) => sum + Math.pow(vol - avgVolume, 2), 0) / volumePeriod
   );
@@ -89,7 +89,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const currentPrice = await getCurrentPrice(symbol);
   const baseRatio = dynamicPriceRangeRatio(currentPrice, atr, config.baseRatio);
 
-    // ========== 趋势确认函数 ==========
+  // ========== 趋势确认函数 ==========
   const trendConfirmation = (values, period) => {
     const changes = [];
     for (let i = 1; i <= period; i++) {
@@ -101,10 +101,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 改进的成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
-  const isVolumeSpike = (volumeRatio > 1.2 || volumeEMARatio > 1.2) && 
-                        lastVolume > avgVolume + 2 * volumeStdDev;
-  const isVolumeDecline = (volumeRatio < 0.8 || volumeEMARatio < 0.8) && 
-                          lastVolume < avgVolume - 2 * volumeStdDev;
+  const isVolumeSpike = (volumeRatio > 1.2 || volumeEMARatio > 1.2) &&
+    lastVolume > avgVolume + 2 * volumeStdDev;
+  const isVolumeDecline = (volumeRatio < 0.8 || volumeEMARatio < 0.8) &&
+    lastVolume < avgVolume - 2 * volumeStdDev;
 
   // 成交量趋势判断
   const volumeTrendUp = trendConfirmation(alignedVolume, 3);
@@ -154,11 +154,19 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastEma5 < lastEma13) shortScore += 0.5;
   if (lastClose < lastBoll.middle) shortScore += 0.5;
 
+  // 根据ATR百分比动态调整阈值
+  // const atrBasedThreshold = lastATR / lastClose * 1.5;  // 例如：2倍ATR百分比
+  // 结合波动率和时间周期
+  const baseFactor = 1.5; // 基础倍数
+  const volatilityAdjustment = (lastATR / lastClose) * 100; // ATR占比百分比
+  const dynamicFactor = baseFactor + volatilityAdjustment / 50; // 每1%波动率增加0.02倍
+
+  const atrBasedThreshold = lastATR * Math.min(dynamicFactor, 2.5); // 不超过2.5倍
   // 强势条件(权重更高)
   if (lastClose > lastBoll.upper && isVolumeSpike && volumeTrendUp) longScore += 2;
   if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown) shortScore += 2;
-  if (lastEma5 - lastEma13 > 0.05 && uptrendConfirmed && volumeTrendUp) longScore += 1;
-  if (lastEma13 - lastEma5 > 0.05 && downtrendConfirmed && volumeTrendDown) shortScore += 1;
+  if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
+  if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
 
   // ========== 最终信号选择 ==========
   const threshold = 3;
