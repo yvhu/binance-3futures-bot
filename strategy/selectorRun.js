@@ -89,6 +89,15 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const currentPrice = await getCurrentPrice(symbol);
   const baseRatio = dynamicPriceRangeRatio(currentPrice, atr, config.baseRatio);
 
+    // ========== 趋势确认函数 ==========
+  const trendConfirmation = (values, period) => {
+    const changes = [];
+    for (let i = 1; i <= period; i++) {
+      changes.push(values[values.length - i] > values[values.length - i - 1]);
+    }
+    return changes.filter(x => x).length >= period * 0.7;
+  };
+
   // ========== 改进的成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
@@ -107,15 +116,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
   }
-
-  // ========== 趋势确认函数 ==========
-  const trendConfirmation = (values, period) => {
-    const changes = [];
-    for (let i = 1; i <= period; i++) {
-      changes.push(values[values.length - i] > values[values.length - i - 1]);
-    }
-    return changes.filter(x => x).length >= period * 0.7;
-  };
 
   const uptrendConfirmed = trendConfirmation(alignedClose, 5);
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
