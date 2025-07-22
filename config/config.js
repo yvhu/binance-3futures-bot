@@ -95,6 +95,9 @@ module.exports = {
   // 亏损超过 -50% 平仓
   lossThreshold: -0.5,
 
+  // 基础阈值
+  baseRatio: 0.003,
+
   // Telegram 配置
   telegram: {
     // Telegram 机器人 Token（可放入 .env 文件）

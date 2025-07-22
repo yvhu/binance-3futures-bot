@@ -13,6 +13,13 @@ function isFlatMarket({ close, high, low }, atrThreshold = 0.005, priceRangeRati
   return rangeRatio < priceRangeRatio;  // 横盘区间非常窄
 }
 
+function dynamicPriceRangeRatio(currentPrice, atr14, baseRatio) {
+  // const baseRatio = 0.003; // 基础阈值
+  const atrRatio = atr14 / currentPrice;
+  return baseRatio * (1 + atrRatio); // 波动大的品种放宽阈值
+}
+
 module.exports = {
-  isFlatMarket
+  isFlatMarket,
+  dynamicPriceRangeRatio
 };

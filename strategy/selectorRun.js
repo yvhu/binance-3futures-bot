@@ -6,8 +6,10 @@ const { getVWAP } = require('../utils/vwap'); // VWAP计算函数
 // const { getKlines } = require('../binance/market'); // 获取币种K线
 const config = require('../config/config');
 const { log } = require('../utils/logger');
-const { isFlatMarket } = require('../utils/flatFilter');
+const { isFlatMarket, dynamicPriceRangeRatio } = require('../utils/flatFilter');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
+const { getCurrentPrice } = require('../binance/market');
+
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -37,12 +39,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const volume = klines.map(k => k.volume);
   const avgVolume = volume.slice(-20).reduce((a, b) => a + b, 0) / 20;
 
-  // ========== 横盘震荡过滤 ==========
-  const flat = isFlatMarket({ close, high, low }, 0.005, 0.01);
-  if (flat) {
-    log(`🚫 ${symbol} 横盘震荡过滤`);
-    return null;
-  }
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
@@ -77,6 +73,15 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const lastVolume = alignedVolume[minLength - 1];
   const atrPercent = lastATR / lastClose;
 
+  const currentPrice = await getCurrentPrice(symbol);
+  const baseRatio = dynamicPriceRangeRatio(currentPrice, atr, config.baseRatio);
+  // ========== 横盘震荡过滤 ==========
+  const flat = isFlatMarket({ close, high, low }, 0.005, baseRatio);
+  if (flat) {
+    log(`🚫 ${symbol} 横盘震荡过滤`);
+    return null;
+  }
+
   // ========== 趋势确认函数 ==========
   const trendConfirmation = (values, period) => {
     const changes = [];
@@ -104,7 +109,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const now = new Date();
   const hours = now.getHours();
   const minutes = now.getMinutes();
-  
+
   if ((hours === 4 && minutes >= 30) || (hours >= 16 && hours < 18)) {
     log(`🚫 ${symbol} 当前时段流动性不足`);
     return null;
@@ -148,11 +153,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   log(`✅ ${symbol}: ${signal} (得分: ${score})`);
   log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
   log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
-  log(`  成交量: ${lastVolume.toFixed(2)} (平均: ${avgVolume.toFixed(2)}) | ATR: ${lastATR.toFixed(4)} (${(atrPercent*100).toFixed(2)}%)`);
+  log(`  成交量: ${lastVolume.toFixed(2)} (平均: ${avgVolume.toFixed(2)}) | ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%)`);
 
-  return { 
-    symbol, 
-    side: signal, 
+  return {
+    symbol,
+    side: signal,
     score,
     price: lastClose,
     indicators: {
@@ -172,23 +177,23 @@ function calculateATR(klines, period = 14) {
   const highs = klines.map(k => k.high);
   const lows = klines.map(k => k.low);
   const closes = klines.map(k => k.close);
-  
+
   const tr = [];
   for (let i = 1; i < closes.length; i++) {
     const hl = highs[i] - lows[i];
-    const hc = Math.abs(highs[i] - closes[i-1]);
-    const lc = Math.abs(lows[i] - closes[i-1]);
+    const hc = Math.abs(highs[i] - closes[i - 1]);
+    const lc = Math.abs(lows[i] - closes[i - 1]);
     tr.push(Math.max(hl, hc, lc));
   }
-  
+
   const atr = new Array(period).fill(NaN);
   let sum = tr.slice(0, period).reduce((a, b) => a + b, 0);
   atr.push(sum / period);
-  
+
   for (let i = period + 1; i < closes.length; i++) {
-    atr.push((atr[i-1] * (period - 1) + tr[i-1]) / period);
+    atr.push((atr[i - 1] * (period - 1) + tr[i - 1]) / period);
   }
-  
+
   return atr;
 }
 
