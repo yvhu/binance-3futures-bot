@@ -72,6 +72,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const alignedBoll = boll.slice(-minLength);
   const alignedATR = atr.slice(-minLength);
   const alignedVolume = volume.slice(offset);
+  log(`🚫 ${symbol} offset: ${offset}`);
   const alignedVolumeEMA = volumeEMA.slice(-minLength);
 
   // 获取最新值 minLength - 1（index=长度-1取最后一个数据）
@@ -84,6 +85,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
 
   const lastATR = alignedATR[minLength - 1];
   const lastVolume = alignedVolume[minLength - 1];
+  log(`🚫 ${symbol} minLength: ${minLength}`);
   const lastVolumeEMAValue = alignedVolumeEMA[minLength - 1];
   const atrPercent = lastATR / lastClose;
 
@@ -124,7 +126,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
 
   // ========== 波动性和成交量过滤 ==========
-  if (atrPercent < 0.003) {
+  if (atrPercent < 0.002) {
     log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
     return null;
   }
