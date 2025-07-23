@@ -9,6 +9,7 @@ const { getPosition, setPosition, removePosition, hasPosition } = require('../ut
 const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
 const { getOrderMode } = require('../utils/state');
+const _ = require('lodash');
 // === 止损参数配置 ===
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
 
