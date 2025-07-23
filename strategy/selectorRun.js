@@ -96,16 +96,18 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     for (let i = 1; i <= period; i++) {
       changes.push(values[values.length - i] > values[values.length - i - 1]);
     }
-    return changes.filter(x => x).length >= period * 0.7;
+    // 改为60%或使用加权确认
+    return changes.filter(x => x).length >= Math.floor(period * 0.6);
   };
 
   // ========== 改进的成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
-  const isVolumeSpike = (volumeRatio > 1.2 || volumeEMARatio > 1.2) &&
-    lastVolume > avgVolume + 2 * volumeStdDev;
-  const isVolumeDecline = (volumeRatio < 0.8 || volumeEMARatio < 0.8) &&
-    lastVolume < avgVolume - 2 * volumeStdDev;
+  // 改为或条件而非与条件
+  const isVolumeSpike = (volumeRatio > 1.5 || volumeEMARatio > 1.5) ||
+    lastVolume > avgVolume + 1.5 * volumeStdDev;
+  const isVolumeDecline = (volumeRatio < 0.85 || volumeEMARatio < 0.85) ||
+    lastVolume < avgVolume - 1.5 * volumeStdDev;
 
   // 成交量趋势判断
   const volumeTrendUp = trendConfirmation(alignedVolume, 3);
