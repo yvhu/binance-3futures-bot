@@ -33,10 +33,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (!klines || klines.length < 50) return null;
 
   // 提取价格和成交量数据
-  const close = klines.map(k => k.close);
-  const high = klines.map(k => k.high);
-  const low = klines.map(k => k.low);
-  const volume = klines.map(k => k.volume);
+  const close = klines.map(k => Number(k.close)).filter(v => !isNaN(v));
+  const high = klines.map(k => Number(k.high)).filter(v => !isNaN(v));
+  const low = klines.map(k => Number(k.low)).filter(v => !isNaN(v));
+  const volume = klines.map(k => Number(k.volume)).filter(v => !isNaN(v));
 
   // ========== 改进的成交量计算 ==========
   const volumePeriod = 50; // 使用更长周期计算平均成交量
@@ -53,7 +53,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
-  const boll = BollingerBands.calculate({ period: 20, values: close });
+  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2});
   const vwap = getVWAP(close, high, low, volume);
   const atr = calculateATR(klines, 14);
 
@@ -74,9 +74,9 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const alignedVolume = volume.slice(offset);
   const alignedVolumeEMA = volumeEMA.slice(-minLength);
 
-  // 获取最新值
+  // 获取最新值 minLength - 1（index=长度-1取最后一个数据）
   const lastClose = alignedClose[minLength - 1];
-  const prevClose = alignedClose[minLength - 2];
+  const prevClose = alignedClose[minLength - 1];
   const lastEma5 = alignedEma5[minLength - 1];
   const lastEma13 = alignedEma13[minLength - 1];
   const lastVWAP = alignedVWAP[minLength - 1];
