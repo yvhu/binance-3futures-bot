@@ -60,7 +60,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const low = klines.map(k => Number(k.low)).filter(v => !isNaN(v));
   const volume = klines.map(k => Number(k.volume)).filter(v => !isNaN(v));
 
-  // ========== 改进的成交量计算 ==========
+  // ========== 计算平均成交量 ==========
   const volumePeriod = 50; // 使用更长周期计算平均成交量
   const avgVolume = volume.slice(-volumePeriod).reduce((a, b) => a + b, 0) / volumePeriod;
 
