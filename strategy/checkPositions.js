@@ -39,7 +39,7 @@ async function checkAndCloseLosingPositions() {
       // 获取当前币种的持仓信息
       const pos = allPositions[symbol]; // 包含：进场价格、方向（BUY/SELL）、持仓数量、持仓时间
 
-      const interval = '3m'; // 使用3分钟K线
+      const interval = config.interval || '3m'; // 使用3分钟K线
       const limit = 100;     // 请求K线数量
 
       // 获取币种K线数据，并剔除最后一根未收盘的K线（slice 0 到 -1）

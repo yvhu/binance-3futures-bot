@@ -104,7 +104,7 @@ async function refreshPositionsFromBinance() {
       const entryPrice = parseFloat(pos.entryPrice);
 
       // === 新增：获取当前K线，用于计算 entryEMA 和 entryBOLL ===
-      const interval = '3m';
+      const interval = config.interval || '3m';
       const klines = (await fetchKlines(symbol, interval, 51)).slice(0, -1);
       if (!klines || klines.length < 30) continue;
 
