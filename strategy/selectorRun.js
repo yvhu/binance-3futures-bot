@@ -53,7 +53,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 计算指标 ==========
   const ema5 = EMA.calculate({ period: 5, values: close });
   const ema13 = EMA.calculate({ period: 13, values: close });
-  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2});
+  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
   const vwap = getVWAP(close, high, low, volume);
   const atr = calculateATR(klines, 14);
 
@@ -81,7 +81,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const lastEma13 = alignedEma13[minLength - 1];
   const lastVWAP = alignedVWAP[minLength - 1];
   const lastBoll = alignedBoll[minLength - 1];
-  log(`❌ ${symbol} minLength: ${minLength} alignedBollLength: ${alignedBoll.length} lastBoll: ${JSON.stringify(lastBoll)}`);
 
   const lastATR = alignedATR[minLength - 1];
   const lastVolume = alignedVolume[minLength - 1];
@@ -169,6 +168,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown) shortScore += 2;
   if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
   if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
+
+  log(`✅ ${symbol}: (lastClose: ${lastClose} lastBoll.upper: ${lastBoll.upper} isVolumeSpike: ${isVolumeSpike} volumeTrendUp: ${volumeTrendUp} lastBoll.lower: ${lastBoll.lower} volumeTrendDown:${volumeTrendDown})`);
+  log(`✅ ${symbol}: (lastEma5: ${lastEma5} lastEma13: ${lastEma13} atrBasedThreshold: ${atrBasedThreshold} downtrendConfirmed: ${downtrendConfirmed} uptrendConfirmed: ${uptrendConfirmed} )`);
+
   // ========== 最终信号选择 ==========
   const threshold = 3;
   let signal = null;
