@@ -228,6 +228,11 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
         ? (price * (1 - stopLossRate)).toFixed(precision.pricePrecision)
         : (price * (1 + stopLossRate)).toFixed(precision.pricePrecision);
 
+      // 计算收益率（亏损比例）
+      const profitLossRate = side === 'BUY'
+        ? ((stopPrice / price - 1) * 100).toFixed(2) + '%'  // 做多止损：亏损比例
+        : ((1 - stopPrice / price) * 100).toFixed(2) + '%'; // 做空止损：亏损比例
+
       const stopParams = new URLSearchParams({
         symbol,
         side: stopSide,
@@ -245,7 +250,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
       const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
       const stopRes = await proxyPost(stopUrl, null, { headers });
       log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
-      sendTelegramMessage(`📉 已挂止损单：${symbol} 方向: ${stopSide}，触发价: ${stopPrice}`);
+      sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
     }
 
     // === 如果是开仓，挂止盈单（盈利10%止盈） ===
@@ -254,6 +259,11 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
       const takeProfitPrice = side === 'BUY'
         ? (price * (1 + takeProfitRate)).toFixed(precision.pricePrecision)
         : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
+
+      // 计算收益率（盈利比例）
+  const profitRate = side === 'BUY'
+    ? ((takeProfitPrice / price - 1) * 100).toFixed(2) + '%'  // 做多止盈：盈利比例
+    : ((1 - takeProfitPrice / price) * 100).toFixed(2) + '%'; // 做空止盈：盈利比例
 
       const tpParams = new URLSearchParams({
         symbol,
@@ -273,7 +283,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
       const tpRes = await proxyPost(tpUrl, null, { headers });
 
       log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
-      sendTelegramMessage(`💰 已挂止盈单：${symbol} 方向: ${takeProfitSide}，触发价: ${takeProfitPrice}`);
+      sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
     }
 
 

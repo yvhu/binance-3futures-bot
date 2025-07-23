@@ -27,7 +27,7 @@ async function checkLossTradesAndFilter() {
     const currentFormatted = formatFullDateTime(new Date(now));
     const pastFormatted = formatFullDateTime(new Date(fifteenMinutesAgo));
 
-    log(`检查时间范围: ${pastFormatted} --- ${currentFormatted}`);
+    // log(`检查时间范围: ${pastFormatted} --- ${currentFormatted}`);
     await sendTelegramMessage(`🧯 检查时间范围：${pastFormatted} --- ${currentFormatted}`);
 
     for (const symbol of topSymbols) {
@@ -71,7 +71,7 @@ async function startSchedulerNew() {
 
       log('⏱ 执行定时策略轮询...');
       const topSymbols = getCachedTopSymbols();
-      await sendTelegramMessage(`⚠️ 参与轮询的数量${topSymbols.length}`);
+      // await sendTelegramMessage(`⚠️ 参与轮询的数量${topSymbols.length}`);
       log(`✅ 获取T50缓存数据`);
       const { topLong, topShort } = await getTopLongShortSymbols(topSymbols, 1); // 获取前1多空币种
       if (topLong.length > 0) {
