@@ -72,21 +72,19 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const alignedBoll = boll.slice(-minLength);
   const alignedATR = atr.slice(-minLength);
   const alignedVolume = volume.slice(offset);
-  log(`🚫 ${symbol} offset: ${offset}`);
   const alignedVolumeEMA = volumeEMA.slice(-minLength);
 
   // 获取最新值 minLength - 1（index=长度-1取最后一个数据）
-  const lastClose = alignedClose[minLength - 1];
-  const prevClose = alignedClose[minLength - 1];
-  const lastEma5 = alignedEma5[minLength - 1];
-  const lastEma13 = alignedEma13[minLength - 1];
-  const lastVWAP = alignedVWAP[minLength - 1];
-  const lastBoll = alignedBoll[minLength - 1];
+  const lastClose = alignedClose[volume.length - 1];
+  const prevClose = alignedClose[minLength - 2];
+  const lastEma5 = alignedEma5[volume.length - 1];
+  const lastEma13 = alignedEma13[volume.length - 1];
+  const lastVWAP = alignedVWAP[volume.length - 1];
+  const lastBoll = alignedBoll[volume.length - 1];
 
-  const lastATR = alignedATR[minLength - 1];
-  const lastVolume = alignedVolume[minLength - 1];
-  log(`🚫 ${symbol} minLength: ${minLength}`);
-  const lastVolumeEMAValue = alignedVolumeEMA[minLength - 1];
+  const lastATR = alignedATR[volume.length - 1];
+  const lastVolume = volume[volume.length - 1];
+  const lastVolumeEMAValue = alignedVolumeEMA[volume.length - 1];
   const atrPercent = lastATR / lastClose;
 
   const currentPrice = await getCurrentPrice(symbol);
