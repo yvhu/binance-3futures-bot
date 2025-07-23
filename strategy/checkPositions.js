@@ -85,7 +85,7 @@ async function checkAndCloseLosingPositions() {
         : (entryPrice - currentPrice) / entryPrice;
 
       // 打印当前收益率
-      log(`${symbol} 当前收益率：${(pnlRate * 100).toFixed(2)}%`);
+      log(`${symbol} 当前收益率：${(pnlRate * 100 * 10).toFixed(2)}%`);
 
       // 是否需要平仓的标志位及理由
       let shouldClose = false;
@@ -140,12 +140,21 @@ async function checkAndCloseLosingPositions() {
       // === 条件⑤：持仓时间超过6分钟，且盈利不超过1%，被认为持仓效率差，触发平仓 ===
       else {
         const now = Date.now(); // 当前时间戳
-        const heldMinutes = (now - entryTime) / 30000; // 持仓持续的分钟数
-
+        const heldMinutes = (now - entryTime) / 60000; // 持仓持续的分钟数
+        // 大于6分钟 盈利低于5% 平仓
         if (heldMinutes > config.minHoldingMinutes && pnlRate < config.minProfitRate) {
           shouldClose = true;
-          reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足1%`;
-          log(`⚠️ ${symbol} 超时无明显盈利，触发平仓`);
+          reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足5%`;
+          log(`⚠️ ${symbol} 超时无明显盈利，触发平仓 当前收益率：${pnlRate}`);
+        } else {
+          // 不满足平仓条件，继续持有
+          log(`✅ ${symbol} 盈利状态良好，继续持有`);
+        }
+        // 时间大于15分钟 盈亏比例小于10平仓
+        if (heldMinutes > 15 && pnlRate < 0.01) {
+          shouldClose = true;
+          reason = `持仓${heldMinutes.toFixed(1)}分钟，收益不足10%`;
+          log(`⚠️ ${symbol} 超时无明显盈利，触发平仓 当前收益率：${pnlRate}`);
         } else {
           // 不满足平仓条件，继续持有
           log(`✅ ${symbol} 盈利状态良好，继续持有`);
