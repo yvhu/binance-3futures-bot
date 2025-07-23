@@ -17,12 +17,18 @@ async function fetchKlines(symbol, interval, limit = 50) {
   const response = await proxyGet(url);
 
   return response.data.map(k => ({
-    time: k[0],
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5])
+    openTime: k[0],                    // 开盘时间
+    open: parseFloat(k[1]),            // 开盘价
+    high: parseFloat(k[2]),            // 最高价
+    low: parseFloat(k[3]),             // 最低价
+    close: parseFloat(k[4]),           // 收盘价
+    volume: parseFloat(k[5]),          // 成交量
+    closeTime: k[6],                   // 收盘时间
+    quoteVolume: parseFloat(k[7]),     // 成交额
+    trades: k[8],                      // 成交笔数
+    takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
+    takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
+    ignore: parseFloat(k[11])          // 忽略字段
   }));
 }
 
@@ -34,12 +40,17 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
 
   // 打印最后一根K线的所有参数
   log(`📊 最后一根K线数据 (${symbol} ${interval}):`);
-  log(`  时间: ${new Date(lastKline.time).toISOString()}`);
+  log(`  开盘时间: ${new Date(lastKline.openTime).toISOString()}`);
   log(`  开盘价: ${lastKline.open}`);
   log(`  最高价: ${lastKline.high}`);
   log(`  最低价: ${lastKline.low}`);
   log(`  收盘价: ${lastKline.close}`);
   log(`  成交量: ${lastKline.volume}`);
+  log(`  收盘时间: ${new Date(lastKline.closeTime).toISOString()}`);
+  log(`  成交额: ${lastKline.quoteVolume}`);
+  log(`  成交笔数: ${lastKline.trades}`);
+  log(`  主动买入成交量: ${lastKline.takerBuyBaseVolume}`);
+  log(`  主动买入成交额: ${lastKline.takerBuyQuoteVolume}`);
 
   if (!klines || klines.length < 50) return null;
 
