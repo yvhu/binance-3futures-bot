@@ -480,9 +480,173 @@ async function getLossIncomes(symbol, startTime, endTime) {
   }
 }
 
+
+
+/**
+ * 清理无效订单并确保每个币种只有最新的止盈止损单
+ */
+async function cleanUpOrphanedOrders() {
+  try {
+    // 1. 获取所有持仓
+    const positions = await fetchAllPositions();
+    
+    // 2. 获取所有活跃订单
+    const allOpenOrders = await fetchAllOpenOrders();
+    
+    // 3. 按交易对分组处理
+    const symbols = _.union(
+      positions.map(p => p.symbol),
+      allOpenOrders.map(o => o.symbol)
+    ).filter(Boolean);
+
+    for (const symbol of symbols) {
+      try {
+        // 4. 处理每个交易对
+        await processSymbolOrders(symbol, positions, allOpenOrders);
+      } catch (err) {
+        log(`❌ ${symbol} 订单清理失败: ${err.message}`);
+      }
+    }
+  } catch (error) {
+    log(`❌ 订单清理全局错误: ${error.message}`);
+  }
+}
+
+/**
+ * 处理单个交易对的订单清理
+ */
+async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
+  // 1. 获取该交易对的持仓和订单
+  const position = allPositions.find(p => p.symbol === symbol);
+  const symbolOrders = allOpenOrders.filter(o => o.symbol === symbol);
+  
+  // 2. 筛选出止盈止损单
+  const stopOrders = symbolOrders.filter(o => 
+    ['STOP_MARKET', 'TAKE_PROFIT_MARKET'].includes(o.type)
+  );
+
+  // 3. 如果没有持仓，撤销所有止盈止损单
+  if (!position || Number(position.positionAmt) === 0) {
+    await cancelAllStopOrders(symbol, stopOrders);
+    return;
+  }
+
+  // 4. 按类型分组（止盈/止损）
+  const ordersByType = _.groupBy(stopOrders, 'type');
+  
+  // 5. 处理每种订单类型
+  for (const [orderType, orders] of Object.entries(ordersByType)) {
+    // 5.1 按时间降序排序
+    const sortedOrders = _.orderBy(orders, ['time'], ['desc']);
+    
+    // 5.2 保留最新的一个，撤销其他的
+    if (sortedOrders.length > 1) {
+      const ordersToCancel = sortedOrders.slice(1);
+      await cancelOrders(symbol, ordersToCancel);
+      log(`✅ ${symbol} 保留最新${orderType}订单，撤销${ordersToCancel.length}个旧订单`);
+    }
+  }
+}
+
+/**
+ * 撤销所有止盈止损单（无持仓时调用）
+ */
+async function cancelAllStopOrders(symbol, orders) {
+  if (orders.length === 0) return;
+  
+  const canceledIds = [];
+  for (const order of orders) {
+    try {
+      await cancelOrder(symbol, order.orderId);
+      canceledIds.push(order.orderId);
+    } catch (error) {
+      log(`❌ ${symbol} 订单${order.orderId}撤销失败: ${error.message}`);
+    }
+  }
+  
+  if (canceledIds.length > 0) {
+    log(`✅ ${symbol} 无持仓，已撤销${canceledIds.length}个止盈止损单`);
+  }
+}
+
+/**
+ * 批量撤销订单
+ */
+async function cancelOrders(symbol, orders) {
+  if (orders.length === 0) return;
+  
+  // 币安批量撤销API最多支持10个订单
+  const chunks = _.chunk(orders, 10);
+  
+  for (const chunk of chunks) {
+    try {
+      await batchCancelOrders(
+        symbol,
+        chunk.map(o => o.orderId)
+      );
+    } catch (error) {
+      log(`❌ ${symbol} 批量撤销失败，尝试单个撤销: ${error.message}`);
+      // 批量失败时回退到单个撤销
+      for (const order of chunk) {
+        await cancelOrder(symbol, order.orderId).catch(e => {
+          log(`❌ ${symbol} 订单${order.orderId}撤销失败: ${e.message}`);
+        });
+      }
+    }
+  }
+}
+
+// ========== 基础API封装 ==========
+async function fetchAllPositions() {
+  const params = new URLSearchParams({ timestamp: Date.now() });
+  const signature = signParams(params);
+  const url = `${config.binance.baseUrl}/fapi/v2/positionRisk?${params}&signature=${signature}`;
+  const res = await proxyGet(url);
+  return res.data.filter(p => Math.abs(Number(p.positionAmt)) > 0);
+}
+
+async function fetchAllOpenOrders() {
+  const params = new URLSearchParams({ timestamp: Date.now() });
+  const signature = signParams(params);
+  const url = `${config.binance.baseUrl}/fapi/v1/openOrders?${params}&signature=${signature}`;
+  const res = await proxyGet(url);
+  return res.data;
+}
+
+async function cancelOrder(symbol, orderId) {
+  const params = new URLSearchParams({ 
+    symbol,
+    orderId,
+    timestamp: Date.now() 
+  });
+  const signature = signParams(params);
+  const url = `${config.binance.baseUrl}/fapi/v1/order?${params}&signature=${signature}`;
+  return proxyDelete(url);
+}
+
+async function batchCancelOrders(symbol, orderIds) {
+  const params = new URLSearchParams({ 
+    symbol,
+    timestamp: Date.now() 
+  });
+  orderIds.forEach((id, i) => params.append(`orderIdList[${i}]`, id));
+  
+  const signature = signParams(params);
+  const url = `${config.binance.baseUrl}/fapi/v1/batchOrders?${params}&signature=${signature}`;
+  return proxyDelete(url);
+}
+
+function signParams(params) {
+  return crypto
+    .createHmac('sha256', config.binance.apiSecret)
+    .update(params.toString())
+    .digest('hex');
+}
+
 module.exports = {
   placeOrder,
   closePositionIfNeeded,
   getAccountTrades,
-  getLossIncomes
+  getLossIncomes,
+  cleanUpOrphanedOrders
 };

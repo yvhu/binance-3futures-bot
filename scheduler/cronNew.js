@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
-const { placeOrder, getLossIncomes } = require('../binance/trade');
+const { placeOrder, getLossIncomes, cleanUpOrphanedOrders } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
@@ -109,7 +109,15 @@ async function startSchedulerNew() {
     }
   });
 
-  log('✅ 定时器启动，每3分钟执行策略，每15分钟执行亏损检测');
+  // 定时任务：每30分钟执行一次
+  cron.schedule('*/30 * * * *', async () => {
+    if (serviceStatus.running) {
+      log('⏱ 执行每30分钟亏损次数检查及订单清理...');
+      await cleanUpOrphanedOrders();
+    }
+  });
+
+  log('✅ 定时器启动，每3分钟执行策略，每15分钟执行亏损检测,每30分钟亏损次数检查及订单清理');
 }
 
 
