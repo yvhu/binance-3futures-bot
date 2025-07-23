@@ -169,7 +169,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
   if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
 
-  log(`✅ ${symbol}: (lastClose: ${lastClose} lastBoll.upper: ${lastBoll.upper} isVolumeSpike: ${isVolumeSpike} volumeTrendUp: ${volumeTrendUp} lastBoll.lower: ${lastBoll.lower} volumeTrendDown:${volumeTrendDown})`);
+  log(`✅ ${symbol}: (lastClose: ${lastClose} lastVWAP: ${lastVWAP} lastBoll.middle: ${lastBoll.middle} lastBoll.lower: ${lastBoll.lower} volumeTrendDown:${volumeTrendDown})`);
+  log(`✅ ${symbol}: (lastClose: ${lastClose} lastBoll.upper: ${lastBoll.upper} isVolumeSpike: ${isVolumeSpike} volumeTrendUp: ${volumeTrendUp})`);
   log(`✅ ${symbol}: (lastEma5: ${lastEma5} lastEma13: ${lastEma13} atrBasedThreshold: ${atrBasedThreshold} downtrendConfirmed: ${downtrendConfirmed} uptrendConfirmed: ${uptrendConfirmed} )`);
 
   // ========== 最终信号选择 ==========
