@@ -28,7 +28,7 @@ async function fetchKlines(symbol, interval, limit = 50) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  const klines = await getKlines(symbol, interval, 100); // 拉取足够的历史K线
+  const klines = await fetchKlines(symbol, interval, 100); // 拉取足够的历史K线
   // const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   if (!klines || klines.length < 50) return null;
 
