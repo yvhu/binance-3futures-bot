@@ -230,8 +230,8 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 
       // 计算收益率（亏损比例）
       const profitLossRate = side === 'BUY'
-        ? ((stopPrice / price - 1) * 100).toFixed(2) + '%'  // 做多止损：亏损比例
-        : ((1 - stopPrice / price) * 100).toFixed(2) + '%'; // 做空止损：亏损比例
+        ? ((stopPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止损：亏损比例
+        : ((1 - stopPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止损：亏损比例
 
       const stopParams = new URLSearchParams({
         symbol,
@@ -262,8 +262,8 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 
       // 计算收益率（盈利比例）
   const profitRate = side === 'BUY'
-    ? ((takeProfitPrice / price - 1) * 100).toFixed(2) + '%'  // 做多止盈：盈利比例
-    : ((1 - takeProfitPrice / price) * 100).toFixed(2) + '%'; // 做空止盈：盈利比例
+    ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止盈：盈利比例
+    : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止盈：盈利比例
 
       const tpParams = new URLSearchParams({
         symbol,
