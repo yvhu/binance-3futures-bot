@@ -488,6 +488,7 @@ async function getLossIncomes(symbol, startTime, endTime) {
  */
 async function cleanUpOrphanedOrders() {
   try {
+    await sendTelegramMessage(`⚠️ 30min开始清理无效订单`);
     // 1. 获取所有持仓
     const positions = await fetchAllPositions();
     
@@ -529,6 +530,7 @@ async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
   // 3. 如果没有持仓，撤销所有止盈止损单
   if (!position || Number(position.positionAmt) === 0) {
     await cancelAllStopOrders(symbol, stopOrders);
+    await sendTelegramMessage(`⚠️ 清理${symbol}止盈止损无效订单`);
     return;
   }
 
@@ -545,6 +547,7 @@ async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
       const ordersToCancel = sortedOrders.slice(1);
       await cancelOrders(symbol, ordersToCancel);
       log(`✅ ${symbol} 保留最新${orderType}订单，撤销${ordersToCancel.length}个旧订单`);
+      await sendTelegramMessage(`⚠️ 清理${symbol}止盈止损旧订单`);
     }
   }
 }
