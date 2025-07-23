@@ -30,32 +30,17 @@ async function fetchKlines(symbol, interval, limit = 50) {
 async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const klines = await fetchKlines(symbol, interval, 100); // 拉取足够的历史K线
   // const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
-  const lastKline = klines[klines.length - 1];
-  // 格式化时间戳为可读时间
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-  };
-  // 打印最后一条K线的完整信息
-  log(`📊 ${symbol} 最新K线数据:`);
-  log(`⏰ 开盘时间: ${formatTime(lastKline[0])}`);
-  log(`⏰ 收盘时间: ${formatTime(lastKline[6])}`);
-  log(`📈 开盘价: ${parseFloat(lastKline[1])}`);
-  log(`📉 最低价: ${parseFloat(lastKline[3])}`);
-  log(`📊 最高价: ${parseFloat(lastKline[2])}`);
-  log(`📌 收盘价: ${parseFloat(lastKline[4])}`);
-  log(`💹 成交量: ${parseFloat(lastKline[5])}`);
-  log(`💰 成交额: ${parseFloat(lastKline[7])}`);
-  log(`🔄 成交笔数: ${lastKline[8]}`);
-  log(`🟢 主动买入成交量: ${parseFloat(lastKline[9])}`);
-  log(`🟢 主动买入成交额: ${parseFloat(lastKline[10])}`);
+  const lastKline = klines[klines.length - 1]; // 获取最后一根K线
+
+  // 打印最后一根K线的所有参数
+  log(`📊 最后一根K线数据 (${symbol} ${interval}):`);
+  log(`  时间: ${new Date(lastKline.time).toISOString()}`);
+  log(`  开盘价: ${lastKline.open}`);
+  log(`  最高价: ${lastKline.high}`);
+  log(`  最低价: ${lastKline.low}`);
+  log(`  收盘价: ${lastKline.close}`);
+  log(`  成交量: ${lastKline.volume}`);
+
   if (!klines || klines.length < 50) return null;
 
   // 提取价格和成交量数据
