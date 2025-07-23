@@ -43,8 +43,8 @@ async function checkAndCloseLosingPositions() {
       const limit = 100;     // 请求K线数量
 
       // 获取币种K线数据，并剔除最后一根未收盘的K线（slice 0 到 -1）
-      // const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
-      const klines = await fetchKlines(symbol, interval, 100); // 拉取足够的历史K线
+      const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+      // const klines = await fetchKlines(symbol, interval, 100); // 拉取足够的历史K线
       if (!klines || klines.length < 30) continue; // 数据不足则跳过
 
       // 提取收盘价数组

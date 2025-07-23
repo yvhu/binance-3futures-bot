@@ -39,8 +39,8 @@ async function analyzeSymbol(symbol, interval) {
     50
   );
   // 获取K线数据并排除最后一条可能未完成的
-  // const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
-  const klines = await fetchKlines(symbol, interval, limit); // 拉取足够的历史K线
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+  // const klines = await fetchKlines(symbol, interval, limit); // 拉取足够的历史K线
 
   if (klines.length < limit) {
     log(`⚠️ 获取K线不足 ${limit} 条，实际只有 ${klines.length}，跳过分析`);
@@ -157,8 +157,8 @@ async function shouldCloseByExitSignal(symbol, interval) {
   );
 
   // 获取K线数据并排除最后一条可能未完成的
-  // const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
-  const klines = await fetchKlines(symbol, interval, limit); // 拉取足够的历史K线
+  const klines = (await fetchKlines(symbol, interval, limit + 1)).slice(0, -1);
+  // const klines = await fetchKlines(symbol, interval, limit); // 拉取足够的历史K线
 
   if (klines.length < limit) {
     log(`⚠️ 获取K线不足 ${limit} 条，实际只有 ${klines.length} 条，跳过分析`);
