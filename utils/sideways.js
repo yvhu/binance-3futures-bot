@@ -1,3 +1,4 @@
+const { log } = require('../utils/logger');
 /**
  * 判断是否处于横盘震荡状态（结合价格标准差 + 布林带宽度 + 横盘持续时间）
  * @param {Array<number>} closePrices - 收盘价数组（至少 N + period 条）
@@ -37,6 +38,7 @@ function isSideways(closePrices, boll, config) {
     const bollWidths = subBolls.map(b => (b.upper - b.lower) / b.middle);
     const avgBollWidth = bollWidths.reduce((a, b) => a + b, 0) / bollWidths.length;
 
+    log(`avgBollWidth: ${avgBollWidth} bollWidths： ${bollWidths}`);
     if (stdRate < priceStdThreshold && avgBollWidth < bollNarrowThreshold) {
       sidewaysDuration++;
       lastReason = `符合横盘条件(波动率${stdRate.toFixed(6)}<${priceStdThreshold}, 布林带宽${avgBollWidth.toFixed(6)}<${bollNarrowThreshold})`;
@@ -44,7 +46,7 @@ function isSideways(closePrices, boll, config) {
       lastReason = `不符合横盘条件(波动率${stdRate.toFixed(6)}>=${priceStdThreshold} 或 布林带宽${avgBollWidth.toFixed(6)}>=${bollNarrowThreshold})`;
       sidewaysDuration = 0;
       // 可以添加调试日志
-      console.log(`K线${i}: ${lastReason}`);
+      // console.log(`K线${i}: ${lastReason}`);
     }
   }
 
@@ -55,9 +57,9 @@ function isSideways(closePrices, boll, config) {
     };
   }
 
-  return { 
+  return {
     sideways: false,
-    reason: lastReason || "未达到横盘持续时间要求" 
+    reason: lastReason || "未达到横盘持续时间要求"
   };
 }
 
