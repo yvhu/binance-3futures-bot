@@ -30,6 +30,13 @@ function isSideways(closePrices, boll, config) {
   for (let i = closePrices.length - minSidewaysDuration; i < closePrices.length; i++) {
     const subCloses = closePrices.slice(i - priceStdPeriod, i);
     const subBolls = boll.slice(i - priceStdPeriod, i);
+    // 调试日志：检查布林带数据
+    log(`检查布林带数据:`, subBolls.map(b => ({
+      upper: b.upper,
+      lower: b.lower,
+      middle: b.middle,
+      isValid: !isNaN(b.upper) && !isNaN(b.lower) && !isNaN(b.middle) && b.middle !== 0
+    })));
 
     const avg = subCloses.reduce((a, b) => a + b, 0) / subCloses.length;
     const std = Math.sqrt(subCloses.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / subCloses.length);
