@@ -14,6 +14,7 @@ function isSideways(closePrices, boll, config) {
     bollNarrowThreshold = 0.01,
     minSidewaysDuration = 6
   } = config;
+    log(`closePrices: ${JSON.parse(closePrices)} ,boll: ${boll}`);
 
   // 首先检查数据长度是否足够
   const requiredLength = priceStdPeriod + minSidewaysDuration;
