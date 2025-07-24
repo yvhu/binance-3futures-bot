@@ -6,6 +6,7 @@ const config = require('../config/config');
 const { log } = require('../utils/logger');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const { isSideways } = require('../utils/sideways');
+const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -175,6 +176,9 @@ async function checkAndCloseLosingPositions() {
     } catch (err) {
       // 捕获该币种处理过程中的异常，记录错误信息
       log(`❌ 检查持仓 ${symbol} 时失败：${err.message}`);
+      // 如果失败了重新执行
+      await refreshPositionsFromBinance();
+      await checkAndCloseLosingPositions();
     }
   }
 }
