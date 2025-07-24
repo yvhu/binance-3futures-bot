@@ -114,13 +114,11 @@ async function checkAndCloseLosingPositions() {
 
       // 在条件③：横盘判断处替换为：
       else if (config.sidewaysExit?.enable && pnlRate > 0) {
-        log(`🔻 ${symbol} 打印横盘判断条件 closePrices：${closePrices} boll：${boll}`);
-        const { sideways, reason: sidewaysReason } = isSideways(closePrices, boll, config.sidewaysExit);
-        log(`🔻 ${symbol} 打印横盘判断结果 sideways：${sideways} sidewaysReason：${sidewaysReason}`);
+        const { sideways, reason } = isSideways(closePrices, boll, config.sidewaysExit);
+        log(`横盘检查结果: ${sideways}, 原因: ${reason}`);
         if (sideways) {
           shouldClose = true;
           reason = sidewaysReason;
-          log(`🔹 ${symbol} ${sidewaysReason}`);
         }
       }
 

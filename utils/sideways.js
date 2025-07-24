@@ -14,13 +14,21 @@ function isSideways(closePrices, boll, config) {
     minSidewaysDuration = 6
   } = config;
 
+  // 首先检查数据长度是否足够
+  const requiredLength = priceStdPeriod + minSidewaysDuration;
+  if (closePrices.length < requiredLength || boll.length < requiredLength) {
+    return {
+      sideways: false,
+      reason: `数据不足(需要${requiredLength}根K线，当前${closePrices.length})`
+    };
+  }
+
   let sidewaysDuration = 0;
+  let lastReason = "";
 
   for (let i = closePrices.length - minSidewaysDuration; i < closePrices.length; i++) {
     const subCloses = closePrices.slice(i - priceStdPeriod, i);
     const subBolls = boll.slice(i - priceStdPeriod, i);
-
-    if (subCloses.length < priceStdPeriod || subBolls.length < priceStdPeriod) continue;
 
     const avg = subCloses.reduce((a, b) => a + b, 0) / subCloses.length;
     const std = Math.sqrt(subCloses.reduce((sum, p) => sum + Math.pow(p - avg, 2), 0) / subCloses.length);
@@ -31,8 +39,12 @@ function isSideways(closePrices, boll, config) {
 
     if (stdRate < priceStdThreshold && avgBollWidth < bollNarrowThreshold) {
       sidewaysDuration++;
+      lastReason = `符合横盘条件(波动率${stdRate.toFixed(6)}<${priceStdThreshold}, 布林带宽${avgBollWidth.toFixed(6)}<${bollNarrowThreshold})`;
     } else {
+      lastReason = `不符合横盘条件(波动率${stdRate.toFixed(6)}>=${priceStdThreshold} 或 布林带宽${avgBollWidth.toFixed(6)}>=${bollNarrowThreshold})`;
       sidewaysDuration = 0;
+      // 可以添加调试日志
+      console.log(`K线${i}: ${lastReason}`);
     }
   }
 
@@ -43,7 +55,10 @@ function isSideways(closePrices, boll, config) {
     };
   }
 
-  return { sideways: false };
+  return { 
+    sideways: false,
+    reason: lastReason || "未达到横盘持续时间要求" 
+  };
 }
 
 module.exports = { isSideways };
