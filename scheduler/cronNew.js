@@ -16,7 +16,7 @@ async function checkLossTradesAndFilter() {
 
     // 当前时间和15分钟前时间戳(ms)
     const now = Date.now();
-    const fifteenMinutesAgo = now - 15 * 60 * 1000;
+    const fifteenMinutesAgo = now - 60 * 60 * 1000;
 
     // 格式化为 YYYY-MM-DD HH:mm:ss
     const formatFullDateTime = (date) => {
