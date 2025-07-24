@@ -125,11 +125,17 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ========== 改进的成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
-  // 改为或条件而非与条件
-  const isVolumeSpike = (volumeRatio > 1.5 || volumeEMARatio > 1.5) ||
-    lastVolume > avgVolume + 1.5 * volumeStdDev;
-  const isVolumeDecline = (volumeRatio < 0.85 || volumeEMARatio < 0.85) ||
-    lastVolume < avgVolume - 1.5 * volumeStdDev;
+  /**
+   * volumeRatio > 1.5（成交量比前一根增长50%）
+   * volumeEMARatio > 1.5（成交量比EMA均线增长50%）
+   * lastVolume > avgVolume + 1.5 * volumeStdDev（成交量超过均值+1.5倍标准差）
+   */
+  const isVolumeSpike =
+    (volumeRatio > 1.3 || volumeEMARatio > 1.3) ||  // 从 1.5 → 1.3（30% 增长）
+    lastVolume > avgVolume + 1.0 * volumeStdDev;    // 从 1.5 → 1.0（更敏感）
+  const isVolumeDecline =
+    (volumeRatio < 0.9 || volumeEMARatio < 0.9) ||  // 从 0.85 → 0.9（10% 萎缩）
+    lastVolume < avgVolume - 1.0 * volumeStdDev;    // 从 1.5 → 1.0（更敏感）
 
   // 成交量趋势判断
   const volumeTrendUp = trendConfirmation(alignedVolume, 3);
