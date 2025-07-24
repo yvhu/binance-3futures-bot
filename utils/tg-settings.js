@@ -1,11 +1,11 @@
 // utils/tg-settings.js
 // NEGATE 取反 NEGATE 取正
 const tgSettings = {
-  signalMode: 'NEGATE', // 可为 'A' 或 'B'
+  signalMode: 'CORRECT', // 可为 'A' 或 'B'
 };
 
 function toggleSignalMode() {
-  tgSettings.signalMode = tgSettings.signalMode === 'NEGATE' ? 'CORRECT' : 'NEGATE';
+  tgSettings.signalMode = tgSettings.signalMode === 'CORRECT' ? 'NEGATE' : 'CORRECT';
   return tgSettings.signalMode;
 }
 
