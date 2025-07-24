@@ -110,12 +110,12 @@ async function startSchedulerNew() {
   });
 
   // 定时任务：每30分钟执行一次
-  cron.schedule('*/5 * * * *', async () => {
-    if (serviceStatus.running) {
-      log('⏱ 执行每30分钟亏损次数检查及订单清理...');
-      await cleanUpOrphanedOrders();
-    }
-  });
+  // cron.schedule('*/5 * * * *', async () => {
+  //   if (serviceStatus.running) {
+  //     log('⏱ 执行每30分钟亏损次数检查及订单清理...');
+  //     await cleanUpOrphanedOrders();
+  //   }
+  // });
 
   log('✅ 定时器启动，每3分钟执行策略，每15分钟执行亏损检测,每30分钟亏损次数检查及订单清理');
 }
