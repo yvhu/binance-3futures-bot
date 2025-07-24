@@ -92,6 +92,7 @@ async function checkAndCloseLosingPositions() {
       let reason = '';
 
       // === 条件①：当前是亏损状态，触发止损 ===
+      log(`🔻 ${symbol} 条件①：当前是亏损状态，触发止损 pnlRate: ${pnlRate}`);
       if (pnlRate < 0) {
         shouldClose = true;
         reason = '止损';
@@ -113,6 +114,7 @@ async function checkAndCloseLosingPositions() {
 
       // 在条件③：横盘判断处替换为：
       else if (config.sidewaysExit?.enable && pnlRate > 0) {
+        log(`🔻 ${symbol} 在条件③：横盘判断处替换为：`);
         const { sideways, reason: sidewaysReason } = isSideways(closePrices, boll, config.sidewaysExit);
         if (sideways) {
           shouldClose = true;
@@ -123,6 +125,7 @@ async function checkAndCloseLosingPositions() {
 
       // === 条件④：波动率持续收敛，认为行情熄火，止盈退出 ===
       else if (pnlRate > 0) {
+        log(`🔻 ${symbol} 条件④：波动率持续收敛，认为行情熄火，止盈退出`);
         const lastN = 5;
         const bodies = klines.slice(-lastN).map(k => Math.abs(k.close - k.open));
         const avgBodySize = bodies.reduce((a, b) => a + b, 0) / lastN;

@@ -102,7 +102,7 @@ async function startSchedulerNew() {
   });
 
   // 每15分钟检查亏损交易次数，移除表现差的币种
-  cron.schedule('*/15 * * * *', async () => {
+  cron.schedule('*/10 * * * *', async () => {
     if (serviceStatus.running) {
       log('⏱ 执行每15分钟亏损次数检查...');
       await checkLossTradesAndFilter();
@@ -110,7 +110,7 @@ async function startSchedulerNew() {
   });
 
   // 定时任务：每30分钟执行一次
-  cron.schedule('*/30 * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     if (serviceStatus.running) {
       log('⏱ 执行每30分钟亏损次数检查及订单清理...');
       await cleanUpOrphanedOrders();
