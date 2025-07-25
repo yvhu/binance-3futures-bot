@@ -312,7 +312,6 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
     try {
       // 1. 获取原始交易信息
       const originalTrade = trade.getTradeById(db, tradeId);
-      db.log.insert('INFO', '策略启动完成');
       if (!originalTrade) {
         throw new Error(`未找到交易记录: ${tradeId}`);
       }

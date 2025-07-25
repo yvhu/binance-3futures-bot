@@ -57,12 +57,9 @@ module.exports = {
         if (!trade) return false;
 
         // 计算盈利
-        let profit;
-        if (trade.side === 'BUY') {
-            profit = (exitPrice - trade.entry_price) * trade.quantity;
-        } else { // SELL
-            profit = (trade.entry_price - exitPrice) * trade.quantity;
-        }
+        const profit = trade.side === 'BUY'
+            ? (exitPrice - trade.entry_price) * trade.quantity
+            : (trade.entry_price - exitPrice) * trade.quantity;
 
         // const exitTime = new Date().toISOString();
         const exitTime = moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');

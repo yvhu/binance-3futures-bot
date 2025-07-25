@@ -8,6 +8,7 @@ if (!fs.existsSync(DB_PATH)) fs.mkdirSync(DB_PATH);
 
 // 单例数据库连接
 const db = new Database(path.join(DB_PATH, 'database.sqlite')); // 不写 verbose 即可
+db.pragma('journal_mode = WAL'); // 更好的性能
 
 // 引入子模块初始化函数
 const log = require('./log');
