@@ -294,6 +294,25 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
   return { topLong, topShort };
 }
 
+// 遍历多个币种，返回 topN 的多头和空头
+async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
+  const longList = [];
+  const shortList = [];
 
+  for (const symbol of symbolList) {
+    try {
+      const res = await evaluateSymbolWithScore(symbol, interval);
+      if (!res) continue;
+      if (res?.side === 'LONG') longList.push(res);
+      if (res?.side === 'SHORT') shortList.push(res);
+    } catch (err) {
+      log(`❌ ${symbol} 评估失败: ${err.message}`);
+    }
+  }
+  // todo
+  const topLong = longList.sort((a, b) => b.score - a.score);
+  const topShort = shortList.sort((a, b) => b.score - a.score);
+  return { topLong, topShort };
+}
 
-module.exports = { getTopLongShortSymbols };
+module.exports = { getTopLongShortSymbols, getTopLongShortSymbolsTest };

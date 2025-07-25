@@ -2,6 +2,7 @@
 const { initTelegramBot } = require('./telegram/bot');
 const { startScheduler } = require('./scheduler/cron');
 const { startSchedulerNew } = require('./scheduler/cronNew');
+const { startSchedulerTest } = require('./scheduler/cronTest')
 const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
@@ -27,7 +28,9 @@ const { getStrategyType } = require('./utils/strategy');
 async function runStrategyCycle() {
   const strategy = getStrategyType();
   if (strategy === 'ema_boll') {
-    await startSchedulerNew();
+    // todo
+    await startSchedulerTest()
+    // await startSchedulerNew();
   } else if (strategy === 'macd_rsi') {
     await startScheduler();
   } else {

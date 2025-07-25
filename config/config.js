@@ -54,7 +54,7 @@ module.exports = {
   // 'ratio' | 'amount'，默认 ratio
   orderMode: 'amount',
   // 当按金额下单时默认金额
-  fixedAmountUSDT: 10,
+  fixedAmountUSDT: 100,
 
   // ================== EMA 均线设置 ==================
   ema: {

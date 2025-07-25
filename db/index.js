@@ -11,20 +11,20 @@ const db = new Database(path.join(DB_PATH, 'database.sqlite')); // 不写 verbos
 
 // 引入子模块初始化函数
 const log = require('./log');
-// const position = require('./position');
-// 可按需引入更多
+const trade = require('./trade');
+const hourlyStats = require('./hourlyStats');
 
 // 初始化所有表
 function initTables() {
   log.init(db);
-//   position.init(db);
-  // 更多表初始化...
+  trade.init(db);
+  hourlyStats.init(db);
 }
 
 module.exports = {
   db,
   initTables,
   log,
-//   position,
-  // 更多表导出
+  trade,
+  hourlyStats,
 };

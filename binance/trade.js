@@ -9,6 +9,7 @@ const { getPosition, setPosition, removePosition, hasPosition } = require('../ut
 const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
 const { getOrderMode } = require('../utils/state');
+const { db, trade } = require('../db');
 const _ = require('lodash');
 // === 止损参数配置 ===
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
@@ -25,7 +26,8 @@ const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
  * @returns {number} 可下单数量（处理过精度），不足最小值返回 0
  */
 async function calcOrderQty(symbol, price) {
-  const mode = getOrderMode(); // 默认为比例模式
+  // const mode = getOrderMode(); // 默认为比例模式
+  const mode = 'amount';
   const leverage = config.leverage || 10;
 
   let usdtBalance = await getUSDTBalance(); // 当前总余额
@@ -262,9 +264,9 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
         : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
 
       // 计算收益率（盈利比例）
-  const profitRate = side === 'BUY'
-    ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止盈：盈利比例
-    : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止盈：盈利比例
+      const profitRate = side === 'BUY'
+        ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止盈：盈利比例
+        : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止盈：盈利比例
 
       const tpParams = new URLSearchParams({
         symbol,
@@ -295,6 +297,17 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
     sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${err.response?.data?.msg || err.message}`);
     throw err;
   }
+}
+
+async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
+  const price = await getCurrentPrice(symbol); // 当前市价
+  // await setLeverage(symbol, config.leverage); // 👈 设置杠杆，重复设置也不会报错
+  // log(`📥 是否平仓：${positionAmt ? '是' : '否'}, 数量: ${positionAmt ? positionAmt : 0}`);
+
+  // 计算下单数量：若传入 positionAmt 说明是平仓，否则根据可用资金计算
+  const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
+  // 根据positionAmt判断是平仓还是新增
+  positionAmt ? trade.closeTrade(db, tradeId, price) : trade.recordTrade(db, { symbol: symbol, price: price, qtyRaw: qtyRaw, side: side });
 }
 
 /**
@@ -491,10 +504,10 @@ async function cleanUpOrphanedOrders() {
     await sendTelegramMessage(`⚠️ 30min开始清理无效订单`);
     // 1. 获取所有持仓
     const positions = await fetchAllPositions();
-    
+
     // 2. 获取所有活跃订单
     const allOpenOrders = await fetchAllOpenOrders();
-    
+
     // 3. 按交易对分组处理
     const symbols = _.union(
       positions.map(p => p.symbol),
@@ -521,9 +534,9 @@ async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
   // 1. 获取该交易对的持仓和订单
   const position = allPositions.find(p => p.symbol === symbol);
   const symbolOrders = allOpenOrders.filter(o => o.symbol === symbol);
-  
+
   // 2. 筛选出止盈止损单
-  const stopOrders = symbolOrders.filter(o => 
+  const stopOrders = symbolOrders.filter(o =>
     ['STOP_MARKET', 'TAKE_PROFIT_MARKET'].includes(o.type)
   );
 
@@ -536,12 +549,12 @@ async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
 
   // 4. 按类型分组（止盈/止损）
   const ordersByType = _.groupBy(stopOrders, 'type');
-  
+
   // 5. 处理每种订单类型
   for (const [orderType, orders] of Object.entries(ordersByType)) {
     // 5.1 按时间降序排序
     const sortedOrders = _.orderBy(orders, ['time'], ['desc']);
-    
+
     // 5.2 保留最新的一个，撤销其他的
     if (sortedOrders.length > 1) {
       const ordersToCancel = sortedOrders.slice(1);
@@ -557,7 +570,7 @@ async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
  */
 async function cancelAllStopOrders(symbol, orders) {
   if (orders.length === 0) return;
-  
+
   const canceledIds = [];
   for (const order of orders) {
     try {
@@ -567,7 +580,7 @@ async function cancelAllStopOrders(symbol, orders) {
       log(`❌ ${symbol} 订单${order.orderId}撤销失败: ${error.message}`);
     }
   }
-  
+
   if (canceledIds.length > 0) {
     log(`✅ ${symbol} 无持仓，已撤销${canceledIds.length}个止盈止损单`);
   }
@@ -578,10 +591,10 @@ async function cancelAllStopOrders(symbol, orders) {
  */
 async function cancelOrders(symbol, orders) {
   if (orders.length === 0) return;
-  
+
   // 币安批量撤销API最多支持10个订单
   const chunks = _.chunk(orders, 10);
-  
+
   for (const chunk of chunks) {
     try {
       await batchCancelOrders(
@@ -618,10 +631,10 @@ async function fetchAllOpenOrders() {
 }
 
 async function cancelOrder(symbol, orderId) {
-  const params = new URLSearchParams({ 
+  const params = new URLSearchParams({
     symbol,
     orderId,
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
   const signature = signParams(params);
   const url = `${config.binance.baseUrl}/fapi/v1/order?${params}&signature=${signature}`;
@@ -629,12 +642,12 @@ async function cancelOrder(symbol, orderId) {
 }
 
 async function batchCancelOrders(symbol, orderIds) {
-  const params = new URLSearchParams({ 
+  const params = new URLSearchParams({
     symbol,
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
   orderIds.forEach((id, i) => params.append(`orderIdList[${i}]`, id));
-  
+
   const signature = signParams(params);
   const url = `${config.binance.baseUrl}/fapi/v1/batchOrders?${params}&signature=${signature}`;
   return proxyDelete(url);
@@ -649,6 +662,7 @@ function signParams(params) {
 
 module.exports = {
   placeOrder,
+  placeOrderTest,
   closePositionIfNeeded,
   getAccountTrades,
   getLossIncomes,
