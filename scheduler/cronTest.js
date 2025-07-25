@@ -15,38 +15,84 @@ const { db, hourlyStats, trade } = require('../db');
 async function startSchedulerTest() {
     // 3分钟策略主循环
     cron.schedule('*/3 * * * *', async () => {
-        /**
-         * 1. 获取24小时成交量数据前五十存入数据库
-         * 2. 策略币种选择器模块
-         */
-        // 这里先查询所有未平仓记录，根据记录调用 placeOrderTest 
-        log(`⏰ 开始3分钟策略循环任务`);
-        const openTrades = trade.getOpenTrades()
-        log(`✅ 平仓任务开始，openTrades：${openTrades}`);
-        for (const openTrade of openTrades) {
-            await placeOrderTest(openTrade.id, openTrade.symbol, (openTrade.side == 'BUY' ? 'SELL' : 'BUY'), openTrade.qtyRaw)
-        }
-        log(`✅ 平仓任务完成`);
-        const topSymbols = getCachedTopSymbols();
-        const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval)
-        if (topLong.length > 0) {
-            for (const long of topLong) {
-                try {
-                    await placeOrderTest(long.symbol, 'BUY');
-                } catch (err) {
-                    log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
-                }
-            }
-        }
+        try {
+            log(`⏰ 开始3分钟策略循环任务`);
 
-        if (topShort.length > 0) {
-            for (const short of topShort) {
-                try {
-                    await placeOrderTest(long.symbol, 'SELL');
-                } catch (err) {
-                    log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
+            // ==================== 平仓逻辑 ====================
+            try {
+                const openTrades = await trade.getOpenTrades(db);
+                log(`✅ 发现 ${openTrades.length} 个未平仓交易`);
+
+                for (const openTrade of openTrades) {
+                    try {
+                        log(`🔄 处理未平仓交易 ID: ${openTrade.id}, 币种: ${openTrade.symbol}, 方向: ${openTrade.side}`);
+
+                        // 确定平仓方向（与开仓相反）
+                        const closeSide = openTrade.side === 'BUY' ? 'SELL' : 'BUY';
+
+                        await placeOrderTest(
+                            openTrade.id,
+                            openTrade.symbol,
+                            closeSide,
+                            openTrade.quantity.toString()
+                        );
+
+                        log(`✅ 成功平仓交易 ID: ${openTrade.id}`);
+                    } catch (err) {
+                        log(`❌ 平仓失败 ID: ${openTrade.id}, 错误: ${err.message}`);
+                        // 继续处理下一个交易
+                        continue;
+                    }
                 }
+            } catch (err) {
+                log(`❌ 获取未平仓交易失败: ${err.message}`);
             }
+
+            log(`✅ 平仓任务完成`);
+
+            // ==================== 开仓逻辑 ====================
+            try {
+                const topSymbols = getCachedTopSymbols();
+                const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
+
+                // 处理做多交易
+                if (topLong.length > 0) {
+                    log(`📈 发现 ${topLong.length} 个做多机会`);
+                    for (const long of topLong) {
+                        try {
+                            log(`尝试做多: ${long.symbol}`);
+                            await placeOrderTest(null, long.symbol, 'BUY');
+                            log(`✅ 做多成功: ${long.symbol}`);
+                        } catch (err) {
+                            log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
+                        }
+                    }
+                } else {
+                    log(`📉 未发现做多机会`);
+                }
+
+                // 处理做空交易
+                if (topShort.length > 0) {
+                    log(`📉 发现 ${topShort.length} 个做空机会`);
+                    for (const short of topShort) {
+                        try {
+                            log(`尝试做空: ${short.symbol}`);
+                            await placeOrderTest(null, short.symbol, 'SELL');
+                            log(`✅ 做空成功: ${short.symbol}`);
+                        } catch (err) {
+                            log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
+                        }
+                    }
+                } else {
+                    log(`📈 未发现做空机会`);
+                }
+            } catch (err) {
+                log(`❌ 开仓策略执行失败: ${err.message}`);
+            }
+
+            log(`🎉 3分钟策略循环任务完成`);
+        } catch (err) {
+            log(`❗❗ 策略循环发生未捕获错误: ${err.message}`);
         }
     });
 
