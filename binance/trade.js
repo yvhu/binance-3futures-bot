@@ -306,7 +306,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
 
   // 计算下单数量
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-  log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : 开仓}`);
+  log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
   if (positionAmt) {
     // 平仓逻辑
     try {
