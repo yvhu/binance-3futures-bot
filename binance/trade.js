@@ -301,13 +301,110 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 
 async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol); // 当前市价
-  // await setLeverage(symbol, config.leverage); // 👈 设置杠杆，重复设置也不会报错
-  // log(`📥 是否平仓：${positionAmt ? '是' : '否'}, 数量: ${positionAmt ? positionAmt : 0}`);
+  // await setLeverage(symbol, config.leverage);
 
-  // 计算下单数量：若传入 positionAmt 说明是平仓，否则根据可用资金计算
+  // 计算下单数量
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-  // 根据positionAmt判断是平仓还是新增
-  positionAmt ? trade.closeTrade(db, tradeId, price) : trade.recordTrade(db, { symbol: symbol, price: price, qtyRaw: qtyRaw, side: side });
+
+  if (positionAmt) {
+    // 平仓逻辑
+    try {
+      // 1. 获取原始交易信息
+      const originalTrade = trade.getTradeById(db, tradeId);
+      if (!originalTrade) {
+        throw new Error(`未找到交易记录: ${tradeId}`);
+      }
+
+      // 2. 执行平仓
+      const success = trade.closeTrade(db, tradeId, price);
+      if (!success) {
+        throw new Error('平仓操作失败');
+      }
+
+      // 3. 获取更新后的交易信息(包含盈亏计算)
+      const closedTrade = trade.getTradeById(db, tradeId);
+
+      // 4. 准备通知消息
+      const message = formatTradeNotification(closedTrade);
+
+      // 5. 发送通知
+      await sendNotification(message);
+
+      log(`✅ 平仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price}`);
+      return closedTrade;
+
+    } catch (err) {
+      log(`❌ 平仓失败: ${symbol} ${side}, 原因: ${err.message}`);
+      throw err;
+    }
+  } else {
+    // 开仓逻辑
+    try {
+      const tradeId = trade.recordTrade(db, {
+        symbol: symbol,
+        price: price,
+        qtyRaw: qtyRaw,
+        side: side
+      });
+
+      log(`✅ 开仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price} 交易ID:${tradeId}`);
+      return { tradeId, symbol, price, qtyRaw, side };
+
+    } catch (err) {
+      log(`❌ 开仓失败: ${symbol} ${side}, 原因: ${err.message}`);
+      throw err;
+    }
+  }
+}
+
+/**
+ * 格式化交易通知消息
+ * @param {Object} trade 交易记录
+ * @returns {string} 格式化后的消息
+ */
+function formatTradeNotification(trade) {
+  const entryTime = new Date(trade.entry_time).toLocaleString();
+  const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleString() : '未平仓';
+
+  return `
+📊 交易结算通知
+──────────────
+币种: ${trade.symbol}
+方向: ${trade.side === 'BUY' ? '做多' : '做空'}
+开仓时间: ${entryTime}
+开仓价格: ${trade.entry_price.toFixed(4)}
+平仓时间: ${exitTime}
+平仓价格: ${trade.exit_price?.toFixed(4) || 'N/A'}
+持仓数量: ${trade.quantity.toFixed(4)}
+──────────────
+盈亏金额: ${trade.profit?.toFixed(4) || '0.0000'} USDT
+收益率: ${calculateROI(trade).toFixed(2)}%
+    `.trim();
+}
+
+/**
+ * 计算收益率
+ * @param {Object} trade 交易记录
+ * @returns {number} 收益率(百分比)
+ */
+function calculateROI(trade) {
+  if (!trade.profit || !trade.order_amount) return 0;
+  return (trade.profit / trade.order_amount) * 100;
+}
+
+/**
+ * 发送通知
+ * @param {string} message 消息内容
+ */
+async function sendNotification(message) {
+  // 这里实现您的通知逻辑，可以是:
+  // 1. 发送到Telegram
+  // 2. 发送到Slack
+  // 3. 发送邮件
+  // 4. 写入日志文件
+  // 示例:
+  await sendTelegramMessage(message);
+  // console.log('发送通知:', message);
 }
 
 /**

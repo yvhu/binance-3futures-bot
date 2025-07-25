@@ -147,4 +147,16 @@ module.exports = {
         ORDER BY COALESCE(exit_time, entry_time)
     `).all(startTime, endTime, startTime, endTime);
     },
+
+    /**
+     * 根据ID获取交易记录
+     * @param {Database} db 数据库实例
+     * @param {number} tradeId 交易ID
+     * @returns {Object|null} 交易记录
+     */
+    getTradeById(db, tradeId) {
+        return db.prepare(`
+        SELECT * FROM trades WHERE id = ?
+    `).get(tradeId);
+    }
 };
