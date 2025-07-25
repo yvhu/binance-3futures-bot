@@ -103,9 +103,8 @@ async function startSchedulerTest() {
 
             // 1. 获取当前小时开始和结束时间
             const now = new Date();
-            const hourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
-            const hourEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 59, 59);
-
+            const hourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1, 0, 0);
+            const hourEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1, 59, 59);
             // 2. 查询本小时内平仓的交易
             const hourlyTrades = trade.getTradesByTimeRange(db, hourStart.toISOString(), hourEnd.toISOString());
 
