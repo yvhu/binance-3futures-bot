@@ -30,7 +30,8 @@ async function calcOrderQty(symbol, price) {
   const mode = 'amount';
   const leverage = config.leverage || 10;
 
-  let usdtBalance = await getUSDTBalance(); // 当前总余额
+  // let usdtBalance = await getUSDTBalance(); // 当前总余额
+  let usdtBalance = 100000000;
   let usdtAmount = 0;
 
   if (mode === 'amount') {
