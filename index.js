@@ -12,8 +12,8 @@ db.initTables(); // 初始化所有表结构
 
 // 示例使用日志模块
 db.log.insert('INFO', '策略启动完成');
-const logs = db.log.list(5);
-console.log('最近日志：', logs);
+// const logs = db.log.list(5);
+// console.log('最近日志：', logs);
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未处理的 Promise 拒绝：', reason);

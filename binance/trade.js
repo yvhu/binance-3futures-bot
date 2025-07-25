@@ -305,12 +305,13 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
 
   // 计算下单数量
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-
+  log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : 开仓}`);
   if (positionAmt) {
     // 平仓逻辑
     try {
       // 1. 获取原始交易信息
       const originalTrade = trade.getTradeById(db, tradeId);
+      db.log.insert('INFO', '策略启动完成');
       if (!originalTrade) {
         throw new Error(`未找到交易记录: ${tradeId}`);
       }
