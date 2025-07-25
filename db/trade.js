@@ -1,4 +1,5 @@
 // db/trade.js
+const moment = require('moment-timezone');
 module.exports = {
     init(db) {
         db.prepare(`
@@ -27,7 +28,8 @@ module.exports = {
      * @returns {number} 插入的ID
      */
     recordTrade(db, { symbol, price, qtyRaw, side }) {
-        const entryTime = new Date().toISOString();
+        // const entryTime = new Date().toISOString();
+        const entryTime = moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
         const orderAmount = 100; // 固定值
 
         const stmt = db.prepare(`
@@ -62,7 +64,8 @@ module.exports = {
             profit = (trade.entry_price - exitPrice) * trade.quantity;
         }
 
-        const exitTime = new Date().toISOString();
+        // const exitTime = new Date().toISOString();
+        const exitTime = moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
 
         // 更新交易记录
         const stmt = db.prepare(`
