@@ -20,11 +20,12 @@ async function startSchedulerTest() {
          * 2. 策略币种选择器模块
          */
         // 这里先查询所有未平仓记录，根据记录调用 placeOrderTest 
+        log(`⏰ 开始3分钟策略循环任务`);
         const openTrades = trade.getOpenTrades()
         for (const openTrade of openTrades) {
             await placeOrderTest(openTrade.id, openTrade.symbol, (openTrade.side == 'BUY' ? 'SELL' : 'BUY'), openTrade.qtyRaw)
         }
-
+        log(`⏰ 平仓任务完成`);
         const topSymbols = getCachedTopSymbols();
         const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval)
         if (topLong.length > 0) {

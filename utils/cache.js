@@ -38,12 +38,12 @@ const cacheTopSymbols = async () => {
     )
     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
 
-  log(`✅ 全部永续合约数据：${JSON.stringify(sorted.map(item => item.symbol), null, 2)}`);
+  // log(`✅ 全部永续合约数据：${JSON.stringify(sorted.map(item => item.symbol), null, 2)}`);
   
   // 4. 取前50名
   const top50 = sorted.slice(0, 50).map(i => i.symbol);
   fs.writeFileSync(config.cachePaths.top50, JSON.stringify(top50, null, 2));
-  log(`✅ 缓存 Top50 USDT永续合约：${top50.length} 个`);
+  // log(`✅ 缓存 Top50 USDT永续合约：${top50.length} 个`);
 
   // 5. 缓存精度信息（保持不变）
   const symbolPrecisions = {};
@@ -64,7 +64,7 @@ const cacheTopSymbols = async () => {
   });
 
   fs.writeFileSync(config.cachePaths.precision, JSON.stringify(symbolPrecisions, null, 2));
-  log(`📌 缓存精度信息：${Object.keys(symbolPrecisions).length} 个币种`);
+  // log(`📌 缓存精度信息：${Object.keys(symbolPrecisions).length} 个币种`);
 };
 
 // 从字符串型 tickSize/stepSize 中获取小数位数
