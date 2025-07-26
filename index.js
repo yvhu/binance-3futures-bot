@@ -7,14 +7,6 @@ const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
 const db = require('./db');
-
-
-
-const {readStrategy} = require('./utils/strategy')
-const {setOrderMode} = require('./utils/state')
-const {readAllPositions} = require('./utils/position')
-const {cacheTopSymbols} = require('./utils/cache')
-
 db.initTables(); // 初始化所有表结构
 
 // 示例使用日志模块
@@ -33,17 +25,17 @@ process.on('uncaughtException', (err) => {
 const { getStrategyType } = require('./utils/strategy');
 
 async function runStrategyCycle() {
-  await startSchedulerTest()
-  // const strategy = getStrategyType();
-  // if (strategy === 'ema_boll') {
-  //   // todo
-  //   await startSchedulerTest()
-  //   // await startSchedulerNew();
-  // } else if (strategy === 'macd_rsi') {
-  //   await startScheduler();
-  // } else {
-  //   log(`❓ 未定义的策略类型: ${strategy}`);
-  // }
+  // await startSchedulerTest()
+  const strategy = getStrategyType();
+  if (strategy === 'ema_boll') {
+    // todo
+    // await startSchedulerTest()
+    await startSchedulerNew();
+  } else if (strategy === 'macd_rsi') {
+    await startScheduler();
+  } else {
+    log(`❓ 未定义的策略类型: ${strategy}`);
+  }
 }
 
 
@@ -51,16 +43,6 @@ async function runStrategyCycle() {
   try {
     log('🚀 启动自动交易策略服务...');
     // log('Telegram Token:', config.telegram.token);
-
-
-
-    readStrategy();
-    setOrderMode('amount');
-    readAllPositions();
-    cacheTopSymbols();
-
-
-
     await initTelegramBot();          // 初始化 TG 按钮控制
     await cacheTopSymbols();          // 启动时获取Top50币种
     await runStrategyCycle()
