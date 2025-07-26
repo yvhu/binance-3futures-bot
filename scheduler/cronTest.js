@@ -140,24 +140,20 @@ async function startSchedulerTest() {
 
                     totalReturnRate += returnRate;
 
-                    // 更新最高和最低收益率
-                    if (returnRate > maxReturnRate) maxReturnRate = returnRate;
-                    if (returnRate < minReturnRate) minReturnRate = returnRate;
+                    // 计算基于max_price和min_price的收益率
+                    if (t.max_price && t.min_price) {
+                        // 计算最高点收益率
+                        const maxPriceReturn = ((t.max_price - t.entry_price) / t.entry_price) * 100 * (t.side === 'BUY' ? 1 : -1);
+                        // 计算最低点收益率
+                        const minPriceReturn = ((t.min_price - t.entry_price) / t.entry_price) * 100 * (t.side === 'BUY' ? 1 : -1);
 
-                    // 使用kline数据计算期间表现
-                    const klineHigh = t.kline_high || t.exit_price; // 使用K线最高价或平仓价
-                    const klineLow = t.kline_low || t.exit_price;   // 使用K线最低价或平仓价
-
-                    // 计算期间收益率（考虑交易方向）
-                    let highReturn, lowReturn;
-                    if (t.side === 'BUY') {
-                        // 做多：高价有利，低价不利
-                        highReturn = ((klineHigh - t.entry_price) / t.entry_price) * 100;
-                        lowReturn = ((klineLow - t.entry_price) / t.entry_price) * 100;
+                        // 更新最高和最低收益率
+                        if (maxPriceReturn > maxReturnRate) maxReturnRate = maxPriceReturn;
+                        if (minPriceReturn < minReturnRate) minReturnRate = minPriceReturn;
                     } else {
-                        // 做空：低价有利，高价不利
-                        highReturn = ((t.entry_price - klineLow) / t.entry_price) * 100;
-                        lowReturn = ((t.entry_price - klineHigh) / t.entry_price) * 100;
+                        // 如果没有max_price和min_price数据，则使用平仓收益率
+                        if (returnRate > maxReturnRate) maxReturnRate = returnRate;
+                        if (returnRate < minReturnRate) minReturnRate = returnRate;
                     }
 
                     if (t.side === 'BUY') {
@@ -231,7 +227,7 @@ async function startSchedulerTest() {
 📊 收益率统计:
 ├─ 平均收益率: ${stats.avg_return_rate.toFixed(2)}%
 ├─ 最高收益率: ${stats.max_return_rate.toFixed(2)}%
-├─ 最低收益率: ${stats.min_return_rate.toFixed(2)}%
+└─ 最低收益率: ${stats.min_return_rate.toFixed(2)}%
 ────────────────`;
 
             await sendTelegramMessage(message);
