@@ -9,21 +9,20 @@ module.exports = {
             CREATE TABLE IF NOT EXISTS hourly_stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 hour DATETIME NOT NULL,
-                total_profit REAL NOT NULL,
-                long_profit REAL NOT NULL,
-                long_loss REAL NOT NULL,
-                short_profit REAL NOT NULL,
-                short_loss REAL NOT NULL,
-                trade_count INTEGER NOT NULL,
-                long_win_count INTEGER NOT NULL,
-                long_loss_count INTEGER NOT NULL,
-                short_win_count INTEGER NOT NULL,
-                short_loss_count INTEGER NOT NULL,
-                long_win_rate REAL NOT NULL,
-                short_win_rate REAL NOT NULL,
-                avg_profit_per_trade REAL NOT NULL,
+                total_profit REAL NOT NULL DEFAULT 0,
+                long_profit REAL NOT NULL DEFAULT 0,
+                long_loss REAL NOT NULL DEFAULT 0,
+                short_profit REAL NOT NULL DEFAULT 0,
+                short_loss REAL NOT NULL DEFAULT 0,
+                trade_count INTEGER NOT NULL DEFAULT 0,
+                long_win_count INTEGER NOT NULL DEFAULT 0,
+                long_loss_count INTEGER NOT NULL DEFAULT 0,
+                short_win_count INTEGER NOT NULL DEFAULT 0,
+                short_loss_count INTEGER NOT NULL DEFAULT 0,
+                long_win_rate REAL NOT NULL DEFAULT 0,
+                short_win_rate REAL NOT NULL DEFAULT 0,
+                avg_profit_per_trade REAL NOT NULL DEFAULT 0,
                 UNIQUE(hour)
-            )
         `).run();
     },
 
@@ -35,15 +34,38 @@ module.exports = {
     record(db, stats) {
         db.prepare(`
             INSERT OR REPLACE INTO hourly_stats 
-            (hour, total_profit, long_profit, short_profit, trade_count, avg_profit_per_trade)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (
+                hour, 
+                total_profit, 
+                long_profit, 
+                long_loss,
+                short_profit,
+                short_loss,
+                trade_count,
+                long_win_count,
+                long_loss_count,
+                short_win_count,
+                short_loss_count,
+                long_win_rate,
+                short_win_rate,
+                avg_profit_per_trade
+            ) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
-            stats.hour,
-            stats.total_profit,
-            stats.long_profit,
-            stats.short_profit,
-            stats.trade_count,
-            stats.avg_profit_per_trade
+            stats.hour || new Date().toISOString(),
+            stats.total_profit || 0,
+            stats.long_profit || 0,
+            stats.long_loss || 0,
+            stats.short_profit || 0,
+            stats.short_loss || 0,
+            stats.trade_count || 0,
+            stats.long_win_count || 0,
+            stats.long_loss_count || 0,
+            stats.short_win_count || 0,
+            stats.short_loss_count || 0,
+            stats.long_win_rate || 0,
+            stats.short_win_rate || 0,
+            stats.avg_profit_per_trade || 0
         );
     },
 
