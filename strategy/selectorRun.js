@@ -167,10 +167,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const hours = now.getHours();
   const minutes = now.getMinutes();
 
-  if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
-    log(`🚫 ${symbol} 当前时段流动性不足`);
-    return null;
-  }
+  // if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
+  //   log(`🚫 ${symbol} 当前时段流动性不足`);
+  //   return null;
+  // }
 
   // ========== 改进后的打分逻辑 ==========
   let longScore = 0;
