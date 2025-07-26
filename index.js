@@ -8,6 +8,13 @@ const { log } = require('./utils/logger');
 const config = require('./config/config');
 const db = require('./db');
 
+
+
+const {readStrategy} = require('./utils/strategy')
+const {setOrderMode} = require('./utils/state')
+const {readAllPositions} = require('./utils/position')
+const {cacheTopSymbols} = require('./utils/cache')
+
 db.initTables(); // 初始化所有表结构
 
 // 示例使用日志模块
@@ -44,6 +51,16 @@ async function runStrategyCycle() {
   try {
     log('🚀 启动自动交易策略服务...');
     // log('Telegram Token:', config.telegram.token);
+
+
+
+    readStrategy();
+    setOrderMode('amount');
+    readAllPositions();
+    cacheTopSymbols();
+
+
+
     await initTelegramBot();          // 初始化 TG 按钮控制
     await cacheTopSymbols();          // 启动时获取Top50币种
     await runStrategyCycle()
