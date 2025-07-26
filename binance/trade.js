@@ -301,7 +301,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 }
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
-async function fetchKlines(symbol, interval, limit = 1) {
+async function fetchKlines(symbol, interval, limit = 2) {
   const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const response = await proxyGet(url);
 
@@ -333,7 +333,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
 
       // 2. 获取当前K线数据（3分钟）
       const klineData = await fetchKlines(symbol, '3m');
-      const { openTime, open, high, low, close, volume } = klineData[0];
+      const { openTime, open, high, low, close, volume } = klineData[1];
       log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
 
       // 3. 执行平仓（带K线数据）
