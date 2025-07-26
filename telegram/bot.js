@@ -23,11 +23,18 @@ const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils
 const { cachePositionRatio, getCachedPositionRatio, getCachedTopSymbols, removeFromTopSymbols } = require('../utils/cache');
 const { setOrderMode, getOrderMode } = require('../utils/state');
 const { getSignalMode, toggleSignalMode } = require('../utils/tg-settings')
+const { getStatsByPage } = require('../db/hourlyStats');
 
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 let serviceStatus = {
   running: false
+};
+
+// 添加全局变量存储当前分页状态
+const paginationState = {
+  currentPage: 1,
+  pageSize: 10
 };
 
 /**
@@ -89,7 +96,7 @@ async function sendMainMenu() {
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
-    [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }],
+    [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
   ];
 
   const ratioButtons = [
@@ -149,6 +156,73 @@ async function sendMainMenu() {
       inline_keyboard: buttons
     }
   });
+}
+
+/**
+ * 新增发送统计分页消息的函数
+ * @param {*} page 
+ * @returns 
+ */
+async function sendStatsPage(page = 1) {
+    const bot = require('./state').getBot();
+    const { data, total, pages } = getStatsByPage(require('../db').db, page, paginationState.pageSize);
+    
+    if (data.length === 0) {
+        return sendTelegramMessage('📊 暂无统计数据');
+    }
+    
+    paginationState.currentPage = page;
+    
+    // 使用表格形式展示数据
+    let message = `📊 小时统计详情 (第 ${page}/${pages} 页)\n`;
+    message += '════════════════════════════\n';
+    
+    data.forEach(stat => {
+        message += `🕒 [${new Date(stat.hour).toLocaleString()}]\n`;
+        message += `├─ 总盈亏: ${formatNumber(stat.total_profit)} USDT\n`;
+        message += `├─ 交易次数: ${stat.trade_count}\n`;
+        message += `├─ 均盈亏: ${formatNumber(stat.avg_profit_per_trade)} USDT\n`;
+        message += `├─ 做多统计:\n`;
+        message += `│  ├─ 盈利: ${formatNumber(stat.long_profit)} (${stat.long_win_count}次)\n`;
+        message += `│  ├─ 亏损: ${formatNumber(stat.long_loss)} (${stat.long_loss_count}次)\n`;
+        message += `│  └─ 胜率: ${stat.long_win_rate.toFixed(1)}%\n`;
+        message += `└─ 做空统计:\n`;
+        message += `   ├─ 盈利: ${formatNumber(stat.short_profit)} (${stat.short_win_count}次)\n`;
+        message += `   ├─ 亏损: ${formatNumber(stat.short_loss)} (${stat.short_loss_count}次)\n`;
+        message += `   └─ 胜率: ${stat.short_win_rate.toFixed(1)}%\n`;
+        message += '════════════════════════════\n';
+    });
+    
+    message += `📝 总计: ${total} 条记录`;
+    
+    // 数字格式化函数（处理负数显示）
+    function formatNumber(num) {
+        return num >= 0 ? 
+            num.toFixed(2) : 
+            `-${Math.abs(num).toFixed(2)}`;
+    }
+
+    // 分页按钮
+    const pageButtons = [];
+    if (page > 1) {
+        pageButtons.push({ text: '◀ 上一页', callback_data: `stats_page_${page - 1}` });
+    }
+    if (page < pages) {
+        pageButtons.push({ text: '下一页 ▶', callback_data: `stats_page_${page + 1}` });
+    }
+    
+    await bot.sendMessage(config.telegram.chatId, message, {
+        reply_markup: {
+            inline_keyboard: [
+                pageButtons,
+                [
+                    { text: '📅 按日期筛选', callback_data: 'filter_stats_date' },
+                    { text: '🔙 返回主菜单', callback_data: 'back_to_main' }
+                ]
+            ],
+            parse_mode: 'Markdown'
+        }
+    });
 }
 
 /**
@@ -306,6 +380,15 @@ async function handleCommand(data, chatId) {
   } else if (data === 'toggle_signal_mode') {
     const newMode = toggleSignalMode();
     await sendTelegramMessage(`✅ 当前信号模式为：${newMode == 'NEGATE' ? '取反' : '取正'}`);
+  } else if (data === 'show_stats') {
+    await sendStatsPage(1);
+  }
+  else if (data.startsWith('stats_page_')) {
+    const page = parseInt(data.replace('stats_page_', ''));
+    await sendStatsPage(page);
+  }
+  else if (data === 'back_to_main') {
+    await sendMainMenu();
   }
 
 }

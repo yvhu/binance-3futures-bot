@@ -97,5 +97,32 @@ module.exports = {
             WHERE hour BETWEEN ? AND ?
             ORDER BY hour
         `).all(startTime, endTime);
-    }
+    },
+
+    /**
+     * 分页查询小时统计数据
+     * @param {Database} db SQLite数据库实例
+     * @param {number} page 页码（从1开始）
+     * @param {number} pageSize 每页条数
+     * @returns {Object} { data: 当前页数据, total: 总条数, pages: 总页数 }
+     */
+    getStatsByPage(db, page = 1, pageSize = 10) {
+        const offset = (page - 1) * pageSize;
+
+        return {
+            data: db.prepare(`
+            SELECT * FROM hourly_stats 
+            ORDER BY hour DESC
+            LIMIT ? OFFSET ?
+        `).all(pageSize, offset),
+
+            total: db.prepare(`
+            SELECT COUNT(*) as total FROM hourly_stats
+        `).get().total,
+
+            pages: Math.ceil(db.prepare(`
+            SELECT COUNT(*) as total FROM hourly_stats
+        `).get().total / pageSize)
+        };
+    },
 };

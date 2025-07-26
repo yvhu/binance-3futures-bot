@@ -1,5 +1,35 @@
 const { db, trade } = require('../db');
 /**
+ * CREATE TABLE IF NOT EXISTS hourly_stats (
+                -- 自增主键ID
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                
+                -- 统计的小时时间点（UTC时间）
+                hour DATETIME NOT NULL,
+                
+                -- 总盈亏金额（美元）
+                total_profit REAL NOT NULL DEFAULT 0,
+                
+                -- 做多相关统计
+                long_profit REAL NOT NULL DEFAULT 0,       -- 做多盈利总额
+                long_loss REAL NOT NULL DEFAULT 0,         -- 做多亏损总额（存储负值）
+                long_win_count INTEGER NOT NULL DEFAULT 0, -- 做多盈利次数
+                long_loss_count INTEGER NOT NULL DEFAULT 0,-- 做多亏损次数
+                long_win_rate REAL NOT NULL DEFAULT 0,     -- 做多胜率百分比
+                
+                -- 做空相关统计
+                short_profit REAL NOT NULL DEFAULT 0,      -- 做空盈利总额
+                short_loss REAL NOT NULL DEFAULT 0,        -- 做空亏损总额（存储负值）
+                short_win_count INTEGER NOT NULL DEFAULT 0,-- 做空盈利次数
+                short_loss_count INTEGER NOT NULL DEFAULT 0,-- 做空亏损次数
+                short_win_rate REAL NOT NULL DEFAULT 0,    -- 做空胜率百分比
+                
+                -- 综合统计
+                trade_count INTEGER NOT NULL DEFAULT 0,    -- 总交易次数
+                avg_profit_per_trade REAL NOT NULL DEFAULT 0 -- 平均每笔交易盈亏
+            )
+ */
+/**
  * CREATE TABLE IF NOT EXISTS trades (
     -- 交易记录唯一标识符，自增主键
     id INTEGER PRIMARY KEY AUTOINCREMENT,
