@@ -11,8 +11,16 @@ module.exports = {
                 hour DATETIME NOT NULL,
                 total_profit REAL NOT NULL,
                 long_profit REAL NOT NULL,
+                long_loss REAL NOT NULL,
                 short_profit REAL NOT NULL,
+                short_loss REAL NOT NULL,
                 trade_count INTEGER NOT NULL,
+                long_win_count INTEGER NOT NULL,
+                long_loss_count INTEGER NOT NULL,
+                short_win_count INTEGER NOT NULL,
+                short_loss_count INTEGER NOT NULL,
+                long_win_rate REAL NOT NULL,
+                short_win_rate REAL NOT NULL,
                 avg_profit_per_trade REAL NOT NULL,
                 UNIQUE(hour)
             )

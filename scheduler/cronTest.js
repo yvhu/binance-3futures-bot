@@ -101,28 +101,49 @@ async function startSchedulerTest() {
         try {
             log(`⏰ 开始执行每小时盈亏计算任务`);
 
-            // 1. 获取当前小时开始和结束时间
+            // 1. 获取过去一小时的时间范围
             const now = new Date();
             const hourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1, 0, 0);
             const hourEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - 1, 59, 59);
-            // 2. 查询本小时内平仓的交易
-            const hourlyTrades = trade.getTradesByTimeRange(db, hourStart.toISOString(), hourEnd.toISOString());
+
+            log(`统计时间范围: ${hourStart.toLocaleString()} 至 ${hourEnd.toLocaleString()}`);
+
+            // 2. 查询过去一小时内的平仓交易
+            const hourlyTrades = await trade.getTradesByTimeRange(db, hourStart.toISOString(), hourEnd.toISOString());
 
             // 3. 计算本小时盈亏
             let totalProfit = 0;
-            let longProfit = 0;
-            let shortProfit = 0;
+            let longProfit = 0;    // 做多盈利总和
+            let longLoss = 0;      // 做多亏损总和
+            let shortProfit = 0;   // 做空盈利总和
+            let shortLoss = 0;     // 做空亏损总和
             let tradeCount = 0;
+            let longWinCount = 0;  // 做多盈利次数
+            let longLossCount = 0; // 做多亏损次数
+            let shortWinCount = 0; // 做空盈利次数
+            let shortLossCount = 0;// 做空亏损次数
 
             hourlyTrades.forEach(t => {
-                if (t.status === 'closed' && t.profit) {
+                if (t.status === 'closed' && t.profit !== null) {
                     totalProfit += t.profit;
                     tradeCount++;
 
                     if (t.side === 'BUY') {
-                        longProfit += t.profit;
-                    } else {
-                        shortProfit += t.profit;
+                        if (t.profit >= 0) {
+                            longProfit += t.profit;
+                            longWinCount++;
+                        } else {
+                            longLoss += t.profit; // 亏损是负值
+                            longLossCount++;
+                        }
+                    } else { // SELL
+                        if (t.profit >= 0) {
+                            shortProfit += t.profit;
+                            shortWinCount++;
+                        } else {
+                            shortLoss += t.profit; // 亏损是负值
+                            shortLossCount++;
+                        }
                     }
                 }
             });
@@ -132,32 +153,54 @@ async function startSchedulerTest() {
                 hour: hourStart.toISOString(),
                 total_profit: totalProfit,
                 long_profit: longProfit,
+                long_loss: longLoss,
                 short_profit: shortProfit,
+                short_loss: shortLoss,
                 trade_count: tradeCount,
+                long_win_count: longWinCount,
+                long_loss_count: longLossCount,
+                short_win_count: shortWinCount,
+                short_loss_count: shortLossCount,
+                long_win_rate: longWinCount + longLossCount > 0
+                    ? (longWinCount / (longWinCount + longLossCount) * 100)
+                    : 0,
+                short_win_rate: shortWinCount + shortLossCount > 0
+                    ? (shortWinCount / (shortWinCount + shortLossCount) * 100)
+                    : 0,
                 avg_profit_per_trade: tradeCount > 0 ? totalProfit / tradeCount : 0
             };
 
             // 5. 记录统计结果
-            hourlyStats.record(db, stats);
+            await hourlyStats.record(db, stats);
 
-            // log(`📊 小时盈亏统计: 
-            // 时间: ${hourStart.toLocaleString()} - ${hourEnd.toLocaleString()}
-            // 总盈亏: ${totalProfit.toFixed(4)} USDT
-            // 做多盈利: ${longProfit.toFixed(4)} USDT
-            // 做空盈利: ${shortProfit.toFixed(4)} USDT
-            // 交易次数: ${tradeCount}
-            // 平均每笔盈利: ${stats.avg_profit_per_trade.toFixed(4)} USDT`);
+            // 6. 发送通知
+            const message = `
+📊 小时盈亏统计 (${hourStart.toLocaleString()} - ${hourEnd.toLocaleString()})
+────────────────
+🔹 总盈亏: ${totalProfit.toFixed(4)} USDT
+🔹 交易次数: ${tradeCount}
 
-            await sendTelegramMessage(`📊 小时盈亏统计: 
-            时间: ${hourStart.toLocaleString()} - ${hourEnd.toLocaleString()}
-            总盈亏: ${totalProfit.toFixed(4)} USDT
-            做多盈利: ${longProfit.toFixed(4)} USDT
-            做空盈利: ${shortProfit.toFixed(4)} USDT
-            交易次数: ${tradeCount}
-            平均每笔盈利: ${stats.avg_profit_per_trade.toFixed(4)} USDT`)
+做多统计:
+✅ 盈利次数: ${longWinCount}次 | 盈利总额: ${longProfit.toFixed(4)} USDT
+❌ 亏损次数: ${longLossCount}次 | 亏损总额: ${Math.abs(longLoss).toFixed(4)} USDT
+📈 净盈亏: ${(longProfit + longLoss).toFixed(4)} USDT
+🎯 胜率: ${stats.long_win_rate.toFixed(2)}%
+
+做空统计:
+✅ 盈利次数: ${shortWinCount}次 | 盈利总额: ${shortProfit.toFixed(4)} USDT
+❌ 亏损次数: ${shortLossCount}次 | 亏损总额: ${Math.abs(shortLoss).toFixed(4)} USDT
+📉 净盈亏: ${(shortProfit + shortLoss).toFixed(4)} USDT
+🎯 胜率: ${stats.short_win_rate.toFixed(2)}%
+
+平均每笔盈利: ${stats.avg_profit_per_trade.toFixed(4)} USDT
+────────────────`;
+
+            await sendTelegramMessage(message);
+            log(`✅ 小时盈亏统计完成`);
 
         } catch (err) {
             log(`❌ 每小时盈亏计算失败: ${err.message}`);
+            await sendTelegramMessage(`⚠️ 每小时统计出错: ${err.message}`);
         }
     });
 }

@@ -41,7 +41,13 @@ const { db, trade } = require('../db');
     -- 'open'表示持仓中(未平仓)
     -- 'closed'表示已平仓
     -- 默认为'open'
-    status TEXT DEFAULT 'open'
+    status TEXT DEFAULT 'open',
+    -- 新增：K线最高价
+    kline_high REAL,
+    -- 新增：K线最低价
+    kline_low REAL,  
+    -- 新增：K线时间  
+    kline_time DATETIME 
 );
  */
 // 记录新交易

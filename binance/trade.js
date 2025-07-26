@@ -300,6 +300,21 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
   }
 }
 
+// 获取指定币种的 K 线数据（默认获取 50 根）
+async function fetchKlines(symbol, interval, limit = 1) {
+  const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const response = await proxyGet(url);
+
+  return response.data.map(k => ({
+    openTime: k[0],
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5])
+  }));
+}
+
 async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol); // 当前市价
   // await setLeverage(symbol, config.leverage);
@@ -316,19 +331,23 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
         throw new Error(`未找到交易记录: ${tradeId}`);
       }
 
-      // 2. 执行平仓
-      const success = trade.closeTrade(db, tradeId, price);
+      // 2. 获取当前K线数据（3分钟）
+      const klineData = await fetchKlines(symbol, '3m');
+      const { high, low, openTime } = klineData;
+
+      // 3. 执行平仓（带K线数据）
+      const success = trade.closeTrade(db, tradeId, price, high, low, openTime);
       if (!success) {
         throw new Error('平仓操作失败');
       }
 
-      // 3. 获取更新后的交易信息(包含盈亏计算)
+      // 4. 获取更新后的交易信息
       const closedTrade = trade.getTradeById(db, tradeId);
 
-      // 4. 准备通知消息
+      // 5. 准备通知消息（可包含K线信息）
       const message = formatTradeNotification(closedTrade);
 
-      // 5. 发送通知
+      // 6. 发送通知
       await sendNotification(message);
 
       log(`✅ 平仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price}`);
@@ -366,21 +385,58 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
 function formatTradeNotification(trade) {
   const entryTime = new Date(trade.entry_time).toLocaleString();
   const exitTime = trade.exit_time ? new Date(trade.exit_time).toLocaleString() : '未平仓';
+  const leverage = config.leverage || 10; // 10倍杠杆
+
+  // 计算杠杆收益率
+  let longHighROI = 0;
+  let longLowROI = 0;
+  let shortHighROI = 0;
+  let shortLowROI = 0;
+
+  if (trade.kline_high && trade.kline_low) {
+    // 做多情况下
+    if (trade.side === 'BUY') {
+      // 最高点收益率 (10倍杠杆)
+      longHighROI = ((trade.kline_high - trade.entry_price) / trade.entry_price) * leverage * 100;
+      // 最低点收益率 (10倍杠杆)
+      longLowROI = ((trade.kline_low - trade.entry_price) / trade.entry_price) * leverage * 100;
+    }
+    // 做空情况下
+    else {
+      // 最高点收益率 (10倍杠杆)
+      shortHighROI = ((trade.entry_price - trade.kline_high) / trade.entry_price) * leverage * 100;
+      // 最低点收益率 (10倍杠杆)
+      shortLowROI = ((trade.entry_price - trade.kline_low) / trade.entry_price) * leverage * 100;
+    }
+  }
 
   return `
 📊 交易结算通知
 ──────────────
 币种: ${trade.symbol}
-方向: ${trade.side === 'BUY' ? '做多' : '做空'}
+方向: ${trade.side === 'BUY' ? '做多' : '做空'} (${leverage}倍杠杆)
 开仓时间: ${entryTime}
 开仓价格: ${trade.entry_price.toFixed(4)}
 平仓时间: ${exitTime}
 平仓价格: ${trade.exit_price?.toFixed(4) || 'N/A'}
+K线时间: ${trade.kline_time ? new Date(trade.kline_time).toLocaleString() : 'N/A'}
+K线最高: ${trade.kline_high?.toFixed(4) || 'N/A'}
+K线最低: ${trade.kline_low?.toFixed(4) || 'N/A'}
 持仓数量: ${trade.quantity.toFixed(4)}
 ──────────────
-盈亏金额: ${trade.profit?.toFixed(4) || '0.0000'} USDT
-收益率: ${calculateROI(trade).toFixed(2)}%
-    `.trim();
+${trade.side === 'BUY' ? `
+做多潜在收益率(10倍杠杆):
+↑ 最高点收益率: ${longHighROI.toFixed(2)}%
+↓ 最低点收益率: ${longLowROI.toFixed(2)}%
+` : `
+做空潜在收益率(10倍杠杆):
+↑ 最高点收益率: ${shortHighROI.toFixed(2)}%
+↓ 最低点收益率: ${shortLowROI.toFixed(2)}%
+`}
+──────────────
+实际盈亏金额: ${trade.profit?.toFixed(4) || '0.0000'} USDT
+实际收益率: ${calculateROI(trade).toFixed(2)}%
+──────────────`.trim();
 }
 
 /**

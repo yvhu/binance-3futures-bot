@@ -3,20 +3,23 @@ const moment = require('moment-timezone');
 module.exports = {
     init(db) {
         db.prepare(`
-            CREATE TABLE IF NOT EXISTS trades (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                symbol TEXT NOT NULL,
-                entry_time DATETIME NOT NULL,
-                entry_price REAL NOT NULL,
-                order_amount REAL NOT NULL,
-                quantity REAL NOT NULL,
-                side TEXT NOT NULL,
-                exit_price REAL,
-                exit_time DATETIME,
-                profit REAL,
-                status TEXT DEFAULT 'open'
-            )
-        `).run();
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            entry_time DATETIME NOT NULL,
+            entry_price REAL NOT NULL,
+            order_amount REAL NOT NULL,
+            quantity REAL NOT NULL,
+            side TEXT NOT NULL,
+            exit_price REAL,
+            exit_time DATETIME,
+            profit REAL,
+            status TEXT DEFAULT 'open',
+            kline_high REAL,
+            kline_low REAL,
+            kline_time DATETIME
+        )
+    `).run();
     },
 
     /**
@@ -42,17 +45,20 @@ module.exports = {
     },
 
     /**
-     * 平仓交易
+     * 平仓交易（带K线数据）
      * @param {number} tradeId 交易ID
      * @param {number} exitPrice 平仓价格
+     * @param {number} klineHigh K线最高价
+     * @param {number} klineLow K线最低价
+     * @param {string} klineTime K线时间
      * @returns {boolean} 是否成功
      */
-    closeTrade(db, tradeId, exitPrice) {
+    closeTrade(db, tradeId, exitPrice, klineHigh, klineLow, klineTime) {
         // 获取原始交易信息
         const trade = db.prepare(`
-            SELECT entry_price, quantity, side FROM trades 
-            WHERE id = ? AND status = 'open'
-        `).get(tradeId);
+        SELECT entry_price, quantity, side FROM trades 
+        WHERE id = ? AND status = 'open'
+    `).get(tradeId);
 
         if (!trade) return false;
 
@@ -62,16 +68,29 @@ module.exports = {
             : (trade.entry_price - exitPrice) * trade.quantity;
 
         const exitTime = new Date().toISOString();
-        // const exitTime = moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
 
-        // 更新交易记录
+        // 更新交易记录（包含K线数据）
         const stmt = db.prepare(`
-            UPDATE trades 
-            SET exit_price = ?, exit_time = ?, profit = ?, status = 'closed'
-            WHERE id = ?
-        `);
+        UPDATE trades 
+        SET exit_price = ?, 
+            exit_time = ?, 
+            profit = ?, 
+            status = 'closed',
+            kline_high = ?,
+            kline_low = ?,
+            kline_time = ?
+        WHERE id = ?
+    `);
 
-        const info = stmt.run(exitPrice, exitTime, profit, tradeId);
+        const info = stmt.run(
+            exitPrice,
+            exitTime,
+            profit,
+            klineHigh,
+            klineLow,
+            klineTime,
+            tradeId
+        );
         return info.changes > 0;
     },
 
