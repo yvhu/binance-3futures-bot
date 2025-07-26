@@ -128,8 +128,6 @@ async function startSchedulerTest() {
             let totalReturnRate = 0;      // 累计总收益率（%），用于计算平均收益率
             let maxReturnRate = -Infinity; // 单笔交易最高收益率（%），初始设为极小值
             let minReturnRate = Infinity;  // 单笔交易最低收益率（%），初始设为极大值
-            let maxDrawdown = 0;          // 交易期间最大回撤（%），即从最高点到最低点的最大跌幅
-            let maxRunup = 0;             // 交易期间最大上涨（%），即从最低点到最高点的最大涨幅
 
             for (const t of hourlyTrades) {
                 if (t.status === 'closed' && t.profit !== null) {
@@ -146,18 +144,21 @@ async function startSchedulerTest() {
                     if (returnRate > maxReturnRate) maxReturnRate = returnRate;
                     if (returnRate < minReturnRate) minReturnRate = returnRate;
 
-                    // 获取交易期间的最高点和最低点（假设交易记录中有这些数据）
-                    // 如果没有，需要从K线数据或其他来源获取
-                    const maxPrice = t.max_price || t.exit_price; // 如果没有max_price，使用exit_price作为近似
-                    const minPrice = t.min_price || t.exit_price; // 如果没有min_price，使用exit_price作为近似
+                    // 使用kline数据计算期间表现
+                    const klineHigh = t.kline_high || t.exit_price; // 使用K线最高价或平仓价
+                    const klineLow = t.kline_low || t.exit_price;   // 使用K线最低价或平仓价
 
-                    // 计算期间最高收益率和最低收益率
-                    const maxPeriodReturn = ((maxPrice - t.entry_price) / t.entry_price) * 100 * (t.side === 'BUY' ? 1 : -1);
-                    const minPeriodReturn = ((minPrice - t.entry_price) / t.entry_price) * 100 * (t.side === 'BUY' ? 1 : -1);
-
-                    // 更新最大上涨和最大回撤
-                    if (maxPeriodReturn > maxRunup) maxRunup = maxPeriodReturn;
-                    if (minPeriodReturn < maxDrawdown) maxDrawdown = minPeriodReturn;
+                    // 计算期间收益率（考虑交易方向）
+                    let highReturn, lowReturn;
+                    if (t.side === 'BUY') {
+                        // 做多：高价有利，低价不利
+                        highReturn = ((klineHigh - t.entry_price) / t.entry_price) * 100;
+                        lowReturn = ((klineLow - t.entry_price) / t.entry_price) * 100;
+                    } else {
+                        // 做空：低价有利，高价不利
+                        highReturn = ((t.entry_price - klineLow) / t.entry_price) * 100;
+                        lowReturn = ((t.entry_price - klineHigh) / t.entry_price) * 100;
+                    }
 
                     if (t.side === 'BUY') {
                         if (t.profit >= 0) {
@@ -201,9 +202,7 @@ async function startSchedulerTest() {
                 avg_profit_per_trade: tradeCount > 0 ? totalProfit / tradeCount : 0,
                 avg_return_rate: tradeCount > 0 ? totalReturnRate / tradeCount : 0,
                 max_return_rate: maxReturnRate !== -Infinity ? maxReturnRate : 0,
-                min_return_rate: minReturnRate !== Infinity ? minReturnRate : 0,
-                max_runup: maxRunup,       // 新增：期间最大上涨
-                max_drawdown: maxDrawdown  // 新增：期间最大回撤
+                min_return_rate: minReturnRate !== Infinity ? minReturnRate : 0
             };
 
             // 5. 记录统计结果
@@ -233,8 +232,6 @@ async function startSchedulerTest() {
 ├─ 平均收益率: ${stats.avg_return_rate.toFixed(2)}%
 ├─ 最高收益率: ${stats.max_return_rate.toFixed(2)}%
 ├─ 最低收益率: ${stats.min_return_rate.toFixed(2)}%
-├─ 期间最大上涨: ${stats.max_runup.toFixed(2)}%
-└─ 期间最大回撤: ${stats.max_drawdown.toFixed(2)}%
 ────────────────`;
 
             await sendTelegramMessage(message);
