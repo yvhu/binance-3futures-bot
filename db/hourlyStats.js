@@ -21,8 +21,8 @@ module.exports = {
                 short_loss_count INTEGER NOT NULL DEFAULT 0,
                 long_win_rate REAL NOT NULL DEFAULT 0,
                 short_win_rate REAL NOT NULL DEFAULT 0,
-                avg_profit_per_trade REAL NOT NULL DEFAULT 0,
-                UNIQUE(hour)
+                avg_profit_per_trade REAL NOT NULL DEFAULT 0
+            )
         `).run();
     },
 
