@@ -333,7 +333,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
 
       // 2. 获取当前K线数据（3分钟）
       const klineData = await fetchKlines(symbol, '3m');
-      const { openTime, open, high, low, close, volume } = klineData;
+      const { openTime, open, high, low, close, volume } = klineData[0];
       log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
 
       // 3. 执行平仓（带K线数据）
