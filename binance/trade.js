@@ -307,11 +307,11 @@ async function fetchKlines(symbol, interval, limit = 1) {
 
   return response.data.map(k => ({
     openTime: k[0],
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5])
+    open: k[1], // 保持字符串形式
+    high: k[2], // 保持字符串形式
+    low: k[3],  // 保持字符串形式
+    close: k[4], // 保持字符串形式
+    volume: k[5] // 保持字符串形式
   }));
 }
 
@@ -337,7 +337,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
 
       // 3. 执行平仓（带K线数据）
-      const success = trade.closeTrade(db, tradeId, price, high, low, openTime);
+      const success = trade.closeTrade(db, tradeId, price, Number(high), Number(low), openTime);
       if (!success) {
         throw new Error('平仓操作失败');
       }
