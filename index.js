@@ -25,17 +25,17 @@ process.on('uncaughtException', (err) => {
 const { getStrategyType } = require('./utils/strategy');
 
 async function runStrategyCycle() {
-  // await startSchedulerTest()
-  const strategy = getStrategyType();
-  if (strategy === 'ema_boll') {
-    // todo
-    // await startSchedulerTest()
-    await startSchedulerNew();
-  } else if (strategy === 'macd_rsi') {
-    await startScheduler();
-  } else {
-    log(`❓ 未定义的策略类型: ${strategy}`);
-  }
+  await startSchedulerTest()
+  // const strategy = getStrategyType();
+  // if (strategy === 'ema_boll') {
+  //   // todo
+  //   // await startSchedulerTest()
+  //   await startSchedulerNew();
+  // } else if (strategy === 'macd_rsi') {
+  //   await startScheduler();
+  // } else {
+  //   log(`❓ 未定义的策略类型: ${strategy}`);
+  // }
 }
 
 
