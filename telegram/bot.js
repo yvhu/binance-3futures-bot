@@ -164,65 +164,69 @@ async function sendMainMenu() {
  * @returns 
  */
 async function sendStatsPage(page = 1) {
-    const bot = require('./state').getBot();
-    const { data, total, pages } = getStatsByPage(require('../db').db, page, paginationState.pageSize);
-    
-    if (data.length === 0) {
-        return sendTelegramMessage('📊 暂无统计数据');
-    }
-    
-    paginationState.currentPage = page;
-    
-    // 使用表格形式展示数据
-    let message = `📊 小时统计详情 (第 ${page}/${pages} 页)\n`;
-    message += '════════════════════════════\n';
-    
-    data.forEach(stat => {
-        message += `🕒 [${new Date(stat.hour).toLocaleString()}]\n`;
-        message += `├─ 总盈亏: ${formatNumber(stat.total_profit)} USDT\n`;
-        message += `├─ 交易次数: ${stat.trade_count}\n`;
-        message += `├─ 均盈亏: ${formatNumber(stat.avg_profit_per_trade)} USDT\n`;
-        message += `├─ 做多统计:\n`;
-        message += `│  ├─ 盈利: ${formatNumber(stat.long_profit)} (${stat.long_win_count}次)\n`;
-        message += `│  ├─ 亏损: ${formatNumber(stat.long_loss)} (${stat.long_loss_count}次)\n`;
-        message += `│  └─ 胜率: ${stat.long_win_rate.toFixed(1)}%\n`;
-        message += `└─ 做空统计:\n`;
-        message += `   ├─ 盈利: ${formatNumber(stat.short_profit)} (${stat.short_win_count}次)\n`;
-        message += `   ├─ 亏损: ${formatNumber(stat.short_loss)} (${stat.short_loss_count}次)\n`;
-        message += `   └─ 胜率: ${stat.short_win_rate.toFixed(1)}%\n`;
-        message += '════════════════════════════\n';
-    });
-    
-    message += `📝 总计: ${total} 条记录`;
-    
-    // 数字格式化函数（处理负数显示）
-    function formatNumber(num) {
-        return num >= 0 ? 
-            num.toFixed(2) : 
-            `-${Math.abs(num).toFixed(2)}`;
-    }
+  const bot = require('./state').getBot();
+  const { data, total, pages } = getStatsByPage(require('../db').db, page, paginationState.pageSize);
 
-    // 分页按钮
-    const pageButtons = [];
-    if (page > 1) {
-        pageButtons.push({ text: '◀ 上一页', callback_data: `stats_page_${page - 1}` });
+  if (data.length === 0) {
+    return sendTelegramMessage('📊 暂无统计数据');
+  }
+
+  paginationState.currentPage = page;
+
+  // 使用表格形式展示数据
+  let message = `📊 小时统计详情 (第 ${page}/${pages} 页)\n`;
+  message += '════════════════════════════\n';
+
+  data.forEach(stat => {
+    message += `🕒 [${new Date(stat.hour).toLocaleString()}]\n`;
+    message += `├─ 总盈亏: ${formatNumber(stat.total_profit)} USDT\n`;
+    message += `├─ 交易次数: ${stat.trade_count}\n`;
+    message += `├─ 均盈亏: ${formatNumber(stat.avg_profit_per_trade)} USDT\n`;
+    message += `├─ 收益率统计:\n`;
+    message += `│  ├─ 平均: ${stat.avg_return_rate.toFixed(2)}%\n`;
+    message += `│  ├─ 最高: ${stat.max_return_rate.toFixed(2)}%\n`;
+    message += `│  └─ 最低: ${stat.min_return_rate.toFixed(2)}%\n`;
+    message += `├─ 做多统计:\n`;
+    message += `│  ├─ 盈利: ${formatNumber(stat.long_profit)} (${stat.long_win_count}次)\n`;
+    message += `│  ├─ 亏损: ${formatNumber(stat.long_loss)} (${stat.long_loss_count}次)\n`;
+    message += `│  └─ 胜率: ${stat.long_win_rate.toFixed(1)}%\n`;
+    message += `└─ 做空统计:\n`;
+    message += `   ├─ 盈利: ${formatNumber(stat.short_profit)} (${stat.short_win_count}次)\n`;
+    message += `   ├─ 亏损: ${formatNumber(stat.short_loss)} (${stat.short_loss_count}次)\n`;
+    message += `   └─ 胜率: ${stat.short_win_rate.toFixed(1)}%\n`;
+    message += '════════════════════════════\n';
+  });
+
+  message += `📝 总计: ${total} 条记录`;
+
+  // 数字格式化函数（处理负数显示）
+  function formatNumber(num) {
+    return num >= 0 ?
+      num.toFixed(2) :
+      `-${Math.abs(num).toFixed(2)}`;
+  }
+
+  // 分页按钮
+  const pageButtons = [];
+  if (page > 1) {
+    pageButtons.push({ text: '◀ 上一页', callback_data: `stats_page_${page - 1}` });
+  }
+  if (page < pages) {
+    pageButtons.push({ text: '下一页 ▶', callback_data: `stats_page_${page + 1}` });
+  }
+
+  await bot.sendMessage(config.telegram.chatId, message, {
+    reply_markup: {
+      inline_keyboard: [
+        pageButtons,
+        [
+          { text: '📅 按日期筛选', callback_data: 'filter_stats_date' },
+          { text: '🔙 返回主菜单', callback_data: 'back_to_main' }
+        ]
+      ],
+      parse_mode: 'Markdown'
     }
-    if (page < pages) {
-        pageButtons.push({ text: '下一页 ▶', callback_data: `stats_page_${page + 1}` });
-    }
-    
-    await bot.sendMessage(config.telegram.chatId, message, {
-        reply_markup: {
-            inline_keyboard: [
-                pageButtons,
-                [
-                    { text: '📅 按日期筛选', callback_data: 'filter_stats_date' },
-                    { text: '🔙 返回主菜单', callback_data: 'back_to_main' }
-                ]
-            ],
-            parse_mode: 'Markdown'
-        }
-    });
+  });
 }
 
 /**
