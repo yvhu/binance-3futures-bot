@@ -21,7 +21,10 @@ module.exports = {
                 short_loss_count INTEGER NOT NULL DEFAULT 0,
                 long_win_rate REAL NOT NULL DEFAULT 0,
                 short_win_rate REAL NOT NULL DEFAULT 0,
-                avg_profit_per_trade REAL NOT NULL DEFAULT 0
+                avg_profit_per_trade REAL NOT NULL DEFAULT 0,
+                avg_return_rate REAL NOT NULL DEFAULT 0,
+                max_return_rate REAL NOT NULL DEFAULT 0,
+                min_return_rate REAL NOT NULL DEFAULT 0
             )
         `).run();
     },
@@ -48,9 +51,12 @@ module.exports = {
                 short_loss_count,
                 long_win_rate,
                 short_win_rate,
-                avg_profit_per_trade
+                avg_profit_per_trade,
+                avg_return_rate,
+                max_return_rate,
+                min_return_rate
             ) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             stats.hour || new Date().toISOString(),
             stats.total_profit || 0,
@@ -65,7 +71,10 @@ module.exports = {
             stats.short_loss_count || 0,
             stats.long_win_rate || 0,
             stats.short_win_rate || 0,
-            stats.avg_profit_per_trade || 0
+            stats.avg_profit_per_trade || 0,
+            stats.avg_return_rate || 0,
+            stats.max_return_rate || 0,
+            stats.min_return_rate || 0
         );
     },
 
