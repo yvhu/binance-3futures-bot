@@ -303,10 +303,10 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
     try {
       const res = await evaluateSymbolWithScore(symbol, interval);
       if (!res) continue;
-      // if (res?.side === 'LONG') longList.push(res);
-      // if (res?.side === 'SHORT') shortList.push(res);
-      if (res?.side === 'LONG') shortList.push(res);
-      if (res?.side === 'SHORT') longList.push(res);
+      if (res?.side === 'LONG') longList.push(res);
+      if (res?.side === 'SHORT') shortList.push(res);
+      // if (res?.side === 'LONG') shortList.push(res);
+      // if (res?.side === 'SHORT') longList.push(res);
     } catch (err) {
       log(`❌ ${symbol} 评估失败: ${err.message}`);
     }
