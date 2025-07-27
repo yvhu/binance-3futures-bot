@@ -14,7 +14,7 @@ const { db, hourlyStats, trade } = require('../db');
 
 async function startSchedulerTest() {
     // 3分钟策略主循环
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('*/15 * * * *', async () => {
         try {
             log(`⏰ 开始${config.interval}策略循环任务`);
 
