@@ -2,7 +2,7 @@ require('dotenv').config();
 
 module.exports = {
   // 策略使用的K线周期（如3分钟）
-  interval: '3m',
+  interval: '5m',
 
   // 每次选取做多或做空的币种数量（Top N）
   selectionCount: 5,
