@@ -16,7 +16,7 @@ async function startSchedulerTest() {
     // 3分钟策略主循环
     cron.schedule('*/5 * * * *', async () => {
         try {
-            log(`⏰ 开始3分钟策略循环任务`);
+            log(`⏰ 开始${config.interval}策略循环任务`);
 
             // ==================== 平仓逻辑 ====================
             try {
@@ -90,7 +90,7 @@ async function startSchedulerTest() {
                 log(`❌ 开仓策略执行失败: ${err.message}`);
             }
 
-            log(`🎉 3分钟策略循环任务完成`);
+            log(`🎉 ${config.interval}策略循环任务完成`);
         } catch (err) {
             log(`❗❗ 策略循环发生未捕获错误: ${err.message}`);
         }
