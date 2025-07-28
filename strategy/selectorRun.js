@@ -73,9 +73,15 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   );
 
   // ========== 计算指标 ==========
-  const ema5 = EMA.calculate({ period: 5, values: close });
-  const ema13 = EMA.calculate({ period: 13, values: close });
-  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
+  // const ema5 = EMA.calculate({ period: 5, values: close });
+  // const ema13 = EMA.calculate({ period: 13, values: close });
+  // const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
+  // 3m时这些周期覆盖 15m～60m，信号较灵敏。
+  // 15m时这些周期覆盖 1h～5h，可能会滞后。
+  const ema5 = EMA.calculate({ period: 3, values: close });   // 原5 → 3
+  const ema13 = EMA.calculate({ period: 8, values: close });  // 原13 → 8
+  const boll = BollingerBands.calculate({ period: 14, values: close, stdDev: 2 });
+
   const vwap = getVWAP(close, high, low, volume);
   const atr = calculateATR(klines, 14);
 
@@ -130,9 +136,9 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
    * volumeEMARatio > 1.5（成交量比EMA均线增长50%）
    * lastVolume > avgVolume + 1.5 * volumeStdDev（成交量超过均值+1.5倍标准差）
    */
-  const isVolumeSpike =
-    (volumeRatio > 1.3 || volumeEMARatio > 1.3) ||  // 从 1.5 → 1.3（30% 增长）
-    lastVolume > avgVolume + 1.0 * volumeStdDev;    // 从 1.5 → 1.0（更敏感）
+  const isVolumeSpike = config.interval == '15m' ? ((volumeRatio > 1.6 || volumeEMARatio > 1.6) || lastVolume > avgVolume + 1.5 * volumeStdDev) : ((volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev)
+
+  // (volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev; 
   const isVolumeDecline =
     (volumeRatio < 0.9 || volumeEMARatio < 0.9) ||  // 从 0.85 → 0.9（10% 萎缩）
     lastVolume < avgVolume - 1.0 * volumeStdDev;    // 从 1.5 → 1.0（更敏感）
@@ -148,14 +154,17 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     return null;
   }
 
-  const uptrendConfirmed = trendConfirmation(alignedClose, 5);
+  const uptrendConfirmed = config.interval == '15m' ? trendConfirmation(alignedClose, 3) : trendConfirmation(alignedClose, 5);
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
 
   // ========== 波动性和成交量过滤 ==========
-  if (atrPercent < 0.002) {
-    log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
-    return null;
-  }
+  // if (atrPercent < 0.002) {
+  //   log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
+  //   return null;
+  // }
+  // 0.2% ATR 对于 3m 是合理的（例如 BTC 每3分钟 20刀）。
+  // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
+  if (atrPercent < 0.004) return null;
 
   if (isVolumeDecline) {
     log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
@@ -204,7 +213,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // log(`✅ ${symbol}: (lastEma5: ${lastEma5} lastEma13: ${lastEma13} atrBasedThreshold: ${atrBasedThreshold} downtrendConfirmed: ${downtrendConfirmed} uptrendConfirmed: ${uptrendConfirmed} )`);
 
   // ========== 最终信号选择 ==========
-  const threshold = 3;
+  // const threshold = 3;
+  const threshold = config.interval === '15m' ? 2.5 : 3;
   let signal = null;
   let score = 0;
   // log(`✅ ${symbol}: (得分: longScore-${longScore} shortScore-${shortScore})`);
@@ -311,7 +321,6 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
       log(`❌ ${symbol} 评估失败: ${err.message}`);
     }
   }
-  // todo
   const topLong = longList.sort((a, b) => b.score - a.score);
   const topShort = shortList.sort((a, b) => b.score - a.score);
   return { topLong, topShort };
