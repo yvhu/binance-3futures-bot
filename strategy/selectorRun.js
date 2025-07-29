@@ -38,6 +38,22 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   const lastKline = klines[klines.length - 1]; // 获取最后一根K线
 
+  // ============ 计算震荡幅度 ==========
+  const recent10Klines = klines.slice(-10);
+  const oscillations = recent10Klines.map(kline => {
+    const open = parseFloat(kline[1]);    // 开盘价
+    const high = parseFloat(kline[2]);   // 最高价
+    const low = parseFloat(kline[3]);     // 最低价
+
+    // 计算单根K线的震荡幅度(百分比形式)
+    // 公式:(最高价 - 最低价)/开盘价 * 100
+    return (high - low) / open * 100;
+  });
+  // 统计震荡幅度大于0.8%的K线数量
+  const countAboveThreshold = oscillations.filter(osc => osc > 0.8).length;
+  // 判断数量是否过半(即大于5根)
+  const isConditionMet = countAboveThreshold > 5;
+  if(!isConditionMet) return null;
   // 打印最后一根K线的所有参数
   // log(`📊 最后一根K线数据 (${symbol} ${interval}):`);
   // log(`  开盘时间: ${new Date(lastKline.openTime).toISOString()}`);
@@ -78,9 +94,9 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
   // 3m时这些周期覆盖 15m～60m，信号较灵敏。
   // 15m时这些周期覆盖 1h～5h，可能会滞后。
-  const ema5 = EMA.calculate({ period: 3, values: close });   // 原5 → 3
-  const ema13 = EMA.calculate({ period: 8, values: close });  // 原13 → 8
-  const boll = BollingerBands.calculate({ period: 14, values: close, stdDev: 2 });
+  const ema5 = config.interval == '15m' ? EMA.calculate({ period: 3, values: close }) : EMA.calculate({ period: 5, values: close });   // 原5 → 3
+  const ema13 = config.interval == '15m' ? EMA.calculate({ period: 8, values: close }) : EMA.calculate({ period: 13, values: close });  // 原13 → 8
+  const boll = config.interval == '15m' ? BollingerBands.calculate({ period: 14, values: close, stdDev: 2 }) : BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
 
   const vwap = getVWAP(close, high, low, volume);
   const atr = calculateATR(klines, 14);
@@ -164,7 +180,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // }
   // 0.2% ATR 对于 3m 是合理的（例如 BTC 每3分钟 20刀）。
   // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
-  if (atrPercent < 0.004) return null;
+  if (config.interval == '15m' ? (atrPercent < 0.004) : (atrPercent < 0.002)) return null;
 
   if (isVolumeDecline) {
     log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
