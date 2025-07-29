@@ -50,10 +50,13 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     return (high - low) / open * 100;
   });
   // 统计震荡幅度大于0.8%的K线数量
-  const countAboveThreshold = oscillations.filter(osc => osc > 0.8).length;
+  const countAboveThreshold = oscillations.filter(osc => osc > 0.7).length;
   // 判断数量是否过半(即大于5根)
   const isConditionMet = countAboveThreshold > 5;
-  if(!isConditionMet) return null;
+  if (!isConditionMet) {
+    log(`❌ ${symbol} 震荡幅度太小即过滤`);
+    return null;
+  }
   // 打印最后一根K线的所有参数
   // log(`📊 最后一根K线数据 (${symbol} ${interval}):`);
   // log(`  开盘时间: ${new Date(lastKline.openTime).toISOString()}`);
