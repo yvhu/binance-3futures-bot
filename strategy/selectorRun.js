@@ -56,6 +56,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
   const isConditionMet = avgOscillation > 0.6;  // 直接要求平均振幅>0.6%
   if (!isConditionMet) {
+    log(`❌ ${symbol} 震荡幅度数组: ${oscillations}`);
+    log(`❌ ${symbol} 平均震荡幅度: ${avgOscillation}`);
     log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
   }
