@@ -97,8 +97,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
   // 3m时这些周期覆盖 15m～60m，信号较灵敏。
   // 15m时这些周期覆盖 1h～5h，可能会滞后。
-  const ema5 = config.interval == '15m' ? EMA.calculate({ period: 3, values: close }) : EMA.calculate({ period: 5, values: close });   // 原5 → 3
-  const ema13 = config.interval == '15m' ? EMA.calculate({ period: 8, values: close }) : EMA.calculate({ period: 13, values: close });  // 原13 → 8
+  const ema5 = config.interval == '15m' ? EMA.calculate({ period: 5, values: close }) : EMA.calculate({ period: 5, values: close });   // 原5 → 3
+  const ema13 = config.interval == '15m' ? EMA.calculate({ period: 10, values: close }) : EMA.calculate({ period: 13, values: close });  // 原13 → 8
   const boll = config.interval == '15m' ? BollingerBands.calculate({ period: 14, values: close, stdDev: 2 }) : BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
 
   const vwap = getVWAP(close, high, low, volume);
@@ -155,7 +155,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
    * volumeEMARatio > 1.5（成交量比EMA均线增长50%）
    * lastVolume > avgVolume + 1.5 * volumeStdDev（成交量超过均值+1.5倍标准差）
    */
-  const isVolumeSpike = config.interval == '15m' ? ((volumeRatio > 1.6 || volumeEMARatio > 1.6) || lastVolume > avgVolume + 1.5 * volumeStdDev) : ((volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev)
+  const isVolumeSpike = config.interval == '15m' ? ((volumeRatio > 1.4 || volumeEMARatio > 1.4) || lastVolume > avgVolume + 1.2 * volumeStdDev) : ((volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev)
 
   // (volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev; 
   const isVolumeDecline =
@@ -183,7 +183,7 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // }
   // 0.2% ATR 对于 3m 是合理的（例如 BTC 每3分钟 20刀）。
   // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
-  if (config.interval == '15m' ? (atrPercent < 0.004) : (atrPercent < 0.002)) return null;
+  if (config.interval == '15m' ? (atrPercent < 0.003) : (atrPercent < 0.002)) return null;
 
   if (isVolumeDecline) {
     log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
