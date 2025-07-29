@@ -41,13 +41,9 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // ============ 计算震荡幅度 ==========
   const recent10Klines = klines.slice(-10);
   const oscillations = recent10Klines.map(kline => {
-    const open = parseFloat(kline[1]);    // 开盘价
-    const high = parseFloat(kline[2]);   // 最高价
-    const low = parseFloat(kline[3]);     // 最低价
-
     // 计算单根K线的震荡幅度(百分比形式)
     // 公式:(最高价 - 最低价)/开盘价 * 100
-    return (high - low) / open * 100;
+    return (kline.high - kline.low) / kline.open * 100;
   });
   // 统计震荡幅度大于0.8%的K线数量
   // const countAboveThreshold = oscillations.filter(osc => osc > 0.7).length;
