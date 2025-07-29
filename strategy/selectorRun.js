@@ -185,10 +185,10 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
   if (config.interval == '15m' ? (atrPercent < 0.003) : (atrPercent < 0.002)) return null;
 
-  if (isVolumeDecline) {
-    log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
-    return null;
-  }
+  // if (isVolumeDecline) {
+  //   log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
+  //   return null;
+  // }
 
   // ========== 时间过滤 ==========
   const now = new Date();
