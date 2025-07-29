@@ -50,9 +50,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     return (high - low) / open * 100;
   });
   // 统计震荡幅度大于0.8%的K线数量
-  const countAboveThreshold = oscillations.filter(osc => osc > 0.7).length;
-  // 判断数量是否过半(即大于5根)
-  const isConditionMet = countAboveThreshold > 5;
+  // const countAboveThreshold = oscillations.filter(osc => osc > 0.7).length;
+  // // 判断数量是否过半(即大于5根)
+  // const isConditionMet = countAboveThreshold > 5;
+  const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
+  const isConditionMet = avgOscillation > 0.6;  // 直接要求平均振幅>0.6%
   if (!isConditionMet) {
     log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
