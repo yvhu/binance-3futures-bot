@@ -8,6 +8,7 @@ const { refreshPositionsFromBinance, getPosition } = require('../utils/position'
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
 const { removeFromTopSymbols, getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
+const { cacheTopSymbols } = require('../utils/cache');
 const config = require('../config/config');
 // const { getOpenTrades } = require('../db/trade')
 const { db, hourlyStats, trade } = require('../db');
@@ -242,6 +243,19 @@ async function startSchedulerTest() {
         } catch (err) {
             log(`❌ 每小时盈亏计算失败: ${err.message}`);
             await sendTelegramMessage(`⚠️ 每小时统计出错: ${err.message}`);
+        }
+    });
+
+    // 每12小时执行的任务 - 刷新Top50币种
+    cron.schedule('0 */12 * * *', async () => {
+        try {
+            log(`⏰ 开始执行12小时Top50币种刷新任务`);
+            await cacheTopSymbols(); // 刷新 Top50 缓存
+            await sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
+            log(`✅ 12小时Top50币种刷新完成`);
+        } catch (err) {
+            log(`❌ 刷新Top50币种失败: ${err.message}`);
+            await sendTelegramMessage(`⚠️ 刷新Top50币种失败: ${err.message}`);
         }
     });
 }
