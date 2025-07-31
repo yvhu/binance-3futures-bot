@@ -97,6 +97,7 @@ async function sendMainMenu() {
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
     [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
+    [{ text: '📊 24小时统计', callback_data: 'show_daily_stats' }],
   ];
 
   const ratioButtons = [
@@ -268,6 +269,86 @@ async function sendSymbolFilterMenu() {
   });
 }
 
+// 添加新的函数来计算和显示24小时统计数据
+async function sendDailyStats() {
+    const bot = require('./state').getBot();
+    const db = require('../db').db;
+    
+    // 计算24小时前的时间
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    
+    // 获取24小时内的交易记录
+    const trades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE (entry_time >= ? OR exit_time >= ?)
+        AND status = 'closed'
+        ORDER BY exit_time DESC
+    `).all(twentyFourHoursAgo, twentyFourHoursAgo);
+    
+    if (trades.length === 0) {
+        await sendTelegramMessage('📊 近24小时内没有交易记录');
+        return;
+    }
+    
+    let totalProfit = 0;
+    let totalLoss = 0;
+    let profitCount = 0;
+    let lossCount = 0;
+    let maxDrawdown = 0;
+    
+    trades.forEach(trade => {
+        // 计算最大回撤
+        let drawdown = 0;
+        if (trade.side === 'BUY') {
+            const maxDecline = ((trade.kline_low - trade.entry_price) / trade.entry_price) * 100;
+            drawdown = Math.min(maxDecline, -5); // 最大亏损不超过5%
+        } else {
+            const maxDecline = ((trade.entry_price - trade.kline_high) / trade.entry_price) * 100;
+            drawdown = Math.min(maxDecline, -5); // 最大亏损不超过5%
+        }
+        
+        if (trade.profit > 0) {
+            totalProfit += trade.profit;
+            profitCount++;
+        } else {
+            // 使用计算出的回撤作为亏损金额
+            const lossAmount = Math.abs(trade.entry_price * trade.quantity * (drawdown / 100));
+            totalLoss += lossAmount;
+            lossCount++;
+            
+            // 记录最大回撤
+            if (drawdown < maxDrawdown) {
+                maxDrawdown = drawdown;
+            }
+        }
+    });
+    
+    const winRate = profitCount / (profitCount + lossCount) * 100;
+    const netProfit = totalProfit - totalLoss;
+    
+    const message = [
+        '📈 24小时交易统计',
+        '════════════════',
+        `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
+        `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
+        `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
+        `🎯 胜率: ${winRate.toFixed(1)}%`,
+        `⚠️ 最大回撤: ${maxDrawdown.toFixed(1)}%`,
+        '════════════════',
+        `📅 统计时间: ${now.toLocaleString()}`
+    ].join('\n');
+    
+    await bot.sendMessage(config.telegram.chatId, message, {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '🔄 刷新数据', callback_data: 'show_daily_stats' }],
+                [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+            ]
+        }
+    });
+}
+
 /**
  * 处理 Telegram 按钮指令
  * @param {string} data 按钮回调数据
@@ -393,6 +474,9 @@ async function handleCommand(data, chatId) {
   }
   else if (data === 'back_to_main') {
     await sendMainMenu();
+  }
+  else if (data === 'show_daily_stats') {
+    await sendDailyStats();
   }
 
 }
