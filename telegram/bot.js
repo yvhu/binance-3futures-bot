@@ -270,6 +270,11 @@ async function sendSymbolFilterMenu() {
 }
 
 // 添加新的函数来计算和显示24小时统计数据
+/**
+ * 发送24小时交易统计数据
+ * 包含盈利、亏损、净盈亏、胜率和最大回撤等信息
+ * 亏损计算采用5%止损限制规则
+ */
 async function sendDailyStats() {
     const bot = require('./state').getBot();
     const db = require('../db').db;
@@ -278,16 +283,16 @@ async function sendDailyStats() {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     
-    // 获取24小时内的交易记录
+    // 获取24小时内平仓的交易记录
     const trades = db.prepare(`
         SELECT * FROM trades 
-        WHERE (entry_time >= ? OR exit_time >= ?)
+        WHERE exit_time >= ?
         AND status = 'closed'
         ORDER BY exit_time DESC
-    `).all(twentyFourHoursAgo, twentyFourHoursAgo);
+    `).all(twentyFourHoursAgo);
     
     if (trades.length === 0) {
-        await sendTelegramMessage('📊 近24小时内没有交易记录');
+        await sendTelegramMessage('📊 近24小时内没有已平仓的交易记录');
         return;
     }
     
@@ -295,47 +300,62 @@ async function sendDailyStats() {
     let totalLoss = 0;
     let profitCount = 0;
     let lossCount = 0;
-    let maxDrawdown = 0;
+    let maxDrawdownPct = 0; // 最大回撤百分比
+    const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
     
     trades.forEach(trade => {
-        // 计算最大回撤
-        let drawdown = 0;
+        // 计算实际盈亏
+        const actualProfit = trade.side === 'BUY'
+            ? (trade.exit_price - trade.entry_price) * trade.quantity
+            : (trade.entry_price - trade.exit_price) * trade.quantity;
+        
+        // 计算最大允许亏损金额（0.5%本金）
+        const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
+        
+        let adjustedProfit;
         if (trade.side === 'BUY') {
-            const maxDecline = ((trade.kline_low - trade.entry_price) / trade.entry_price) * 100;
-            drawdown = Math.min(maxDecline, -5); // 最大亏损不超过5%
+            // 做多：计算最大潜在亏损（开仓价到最低价）
+            const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
+            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
+                ? -maxAllowedLossAmount 
+                : actualProfit;
         } else {
-            const maxDecline = ((trade.entry_price - trade.kline_high) / trade.entry_price) * 100;
-            drawdown = Math.min(maxDecline, -5); // 最大亏损不超过5%
+            // 做空：计算最大潜在亏损（最高价到开仓价）
+            const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
+            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
+                ? -maxAllowedLossAmount 
+                : actualProfit;
         }
         
-        if (trade.profit > 0) {
-            totalProfit += trade.profit;
+        // 统计分类
+        if (adjustedProfit > 0) {
+            totalProfit += adjustedProfit;
             profitCount++;
         } else {
-            // 使用计算出的回撤作为亏损金额
-            const lossAmount = Math.abs(trade.entry_price * trade.quantity * (drawdown / 100));
-            totalLoss += lossAmount;
+            totalLoss += Math.abs(adjustedProfit);
             lossCount++;
             
-            // 记录最大回撤
-            if (drawdown < maxDrawdown) {
-                maxDrawdown = drawdown;
+            // 计算实际回撤百分比
+            const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity) * 100);
+            if (drawdownPct > maxDrawdownPct) {
+                maxDrawdownPct = drawdownPct;
             }
         }
     });
     
-    const winRate = profitCount / (profitCount + lossCount) * 100;
+    const winRate = trades.length > 0 ? (profitCount / trades.length * 100) : 0;
     const netProfit = totalProfit - totalLoss;
     
     const message = [
-        '📈 24小时交易统计',
-        '════════════════',
+        '📈 24小时交易统计（10倍杠杆，最大亏损0.5%本金）',
+        '══════════════════════════════',
         `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
         `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
         `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
         `🎯 胜率: ${winRate.toFixed(1)}%`,
-        `⚠️ 最大回撤: ${maxDrawdown.toFixed(1)}%`,
-        '════════════════',
+        `⚠️ 最大回撤: ${maxDrawdownPct.toFixed(2)}%本金`,
+        `📝 总交易数: ${trades.length}笔`,
+        '══════════════════════════════',
         `📅 统计时间: ${now.toLocaleString()}`
     ].join('\n');
     
