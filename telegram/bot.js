@@ -97,7 +97,7 @@ async function sendMainMenu() {
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
     [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
-    [{ text: '📊 24小时统计', callback_data: 'show_daily_stats' }],
+    [{ text: '📊 24小时统计', callback_data: 'show_daily_stats' }, { text: '⏰ 3天时段统计', callback_data: 'show_hourly_stats' }],
   ];
 
   const ratioButtons = [
@@ -369,6 +369,161 @@ async function sendDailyStats() {
     });
 }
 
+// 全局变量存储小时统计数据
+let cachedHourlyStats = [];
+let cachedTotalPages = 1;
+
+/**
+ * 发送最近3天按小时分组的交易统计数据
+ */
+async function sendHourlyStats() {
+    const bot = require('./state').getBot();
+    const db = require('../db').db;
+    
+    // 计算3天前的时间
+    const now = new Date();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // 获取3天内的交易记录
+    const trades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE exit_time >= ?
+        AND status = 'closed'
+        ORDER BY exit_time
+    `).all(threeDaysAgo);
+    
+    if (trades.length === 0) {
+        await sendTelegramMessage('📊 最近3天内没有已平仓的交易记录');
+        return;
+    }
+    
+    // 按小时分组（0-23）
+    const hourlyStats = {};
+    const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
+    
+    // 初始化24个小时的空统计
+    for (let hour = 0; hour < 24; hour++) {
+        hourlyStats[hour] = {
+            hour: `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`,
+            totalProfit: 0,
+            totalLoss: 0,
+            profitCount: 0,
+            lossCount: 0,
+            maxDrawdownPct: 0,
+            totalTrades: 0
+        };
+    }
+    
+    // 处理每笔交易
+    trades.forEach(trade => {
+        const exitTime = new Date(trade.exit_time);
+        const hour = exitTime.getHours(); // 获取小时数（0-23）
+        
+        // 计算实际盈亏
+        const actualProfit = trade.side === 'BUY'
+            ? (trade.exit_price - trade.entry_price) * trade.quantity
+            : (trade.entry_price - trade.exit_price) * trade.quantity;
+        
+        // 计算最大允许亏损金额（0.5%本金）
+        const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
+        
+        let adjustedProfit;
+        if (trade.side === 'BUY') {
+            // 做多：计算最大潜在亏损（开仓价到最低价）
+            const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
+            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
+                ? -maxAllowedLossAmount 
+                : actualProfit;
+        } else {
+            // 做空：计算最大潜在亏损（最高价到开仓价）
+            const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
+            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
+                ? -maxAllowedLossAmount 
+                : actualProfit;
+        }
+        
+        // 更新小时统计
+        if (adjustedProfit > 0) {
+            hourlyStats[hour].totalProfit += adjustedProfit;
+            hourlyStats[hour].profitCount++;
+        } else {
+            hourlyStats[hour].totalLoss += Math.abs(adjustedProfit);
+            hourlyStats[hour].lossCount++;
+            
+            // 计算实际回撤百分比
+            const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity)) * 100;
+            if (drawdownPct > hourlyStats[hour].maxDrawdownPct) {
+                hourlyStats[hour].maxDrawdownPct = drawdownPct;
+            }
+        }
+        hourlyStats[hour].totalTrades++;
+    });
+    
+    // 过滤掉没有交易的小时段并排序
+    cachedHourlyStats = Object.values(hourlyStats)
+        .filter(h => h.totalTrades > 0)
+        .sort((a, b) => parseInt(a.hour.split(':')[0]) - parseInt(b.hour.split(':')[0]));
+    
+    cachedTotalPages = Math.ceil(cachedHourlyStats.length / 6);
+    
+    if (cachedHourlyStats.length === 0) {
+        await sendTelegramMessage('📊 最近3天内各时段均无交易记录');
+        return;
+    }
+    
+    // 发送第一页
+    await sendHourlyStatsPage(1);
+}
+
+/**
+ * 发送分页的小时统计结果
+ * @param {number} page 当前页码
+ */
+async function sendHourlyStatsPage(page) {
+    const bot = require('./state').getBot();
+    const startIdx = (page - 1) * 6;
+    const endIdx = Math.min(startIdx + 6, cachedHourlyStats.length);
+    const pageStats = cachedHourlyStats.slice(startIdx, endIdx);
+    
+    let message = `⏰ 最近3天分时段统计（${page}/${cachedTotalPages}）\n`;
+    message += '══════════════════════════════\n';
+    
+    pageStats.forEach(stat => {
+        const netProfit = stat.totalProfit - stat.totalLoss;
+        const winRate = stat.totalTrades > 0 
+            ? (stat.profitCount / stat.totalTrades * 100) 
+            : 0;
+        
+        message += `🕒 ${stat.hour}\n`;
+        message += `├─ 净盈亏: ${netProfit.toFixed(2)} USDT\n`;
+        message += `├─ 交易数: ${stat.totalTrades}笔\n`;
+        message += `├─ 胜率: ${winRate.toFixed(1)}%\n`;
+        message += `└─ 最大回撤: ${stat.maxDrawdownPct.toFixed(2)}%本金\n`;
+        message += '══════════════════════════════\n';
+    });
+    
+    message += `📌 10倍杠杆，最大亏损0.5%本金/笔`;
+    
+    // 分页按钮
+    const buttons = [];
+    if (page > 1) {
+        buttons.push({ text: '◀ 上一页', callback_data: `hourly_page_${page - 1}` });
+    }
+    if (page < cachedTotalPages) {
+        buttons.push({ text: '下一页 ▶', callback_data: `hourly_page_${page + 1}` });
+    }
+    
+    await bot.sendMessage(config.telegram.chatId, message, {
+        reply_markup: {
+            inline_keyboard: [
+                buttons,
+                [{ text: '🔄 重新加载', callback_data: 'show_hourly_stats' },
+                 { text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+            ]
+        }
+    });
+}
+
 /**
  * 处理 Telegram 按钮指令
  * @param {string} data 按钮回调数据
@@ -498,7 +653,18 @@ async function handleCommand(data, chatId) {
   else if (data === 'show_daily_stats') {
     await sendDailyStats();
   }
-
+  else if (data === 'show_hourly_stats') {
+    await sendHourlyStats();
+  }
+  else if (data.startsWith('hourly_page_')) {
+      const page = parseInt(data.replace('hourly_page_', ''));
+      if (page >= 1 && page <= cachedTotalPages) {
+          await sendHourlyStatsPage(page);
+      } else {
+          await sendTelegramMessage('⚠️ 页码无效，正在返回第一页');
+          await sendHourlyStatsPage(1);
+      }
+  }
 }
 
 module.exports = {
