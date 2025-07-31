@@ -97,7 +97,7 @@ async function sendMainMenu() {
     [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
     [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
-    [{ text: '📊 24小时统计', callback_data: 'show_daily_stats' }, { text: '⏰ 3天时段统计', callback_data: 'show_hourly_stats' }],
+    [{ text: '📊 24小时统计', callback_data: 'show_daily_stats' }, { text: '⏰ 全历史时段统计', callback_data: 'show_all_hourly_stats' }],
   ];
 
   const ratioButtons = [
@@ -374,26 +374,21 @@ let cachedHourlyStats = [];
 let cachedTotalPages = 1;
 
 /**
- * 发送最近3天按小时分组的交易统计数据
+ * 发送所有历史数据按小时分组的交易统计数据
  */
-async function sendHourlyStats() {
+async function sendAllHourlyStats() {
     const bot = require('./state').getBot();
     const db = require('../db').db;
     
-    // 计算3天前的时间
-    const now = new Date();
-    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
-    
-    // 获取3天内的交易记录
+    // 获取所有历史交易记录
     const trades = db.prepare(`
         SELECT * FROM trades 
-        WHERE exit_time >= ?
-        AND status = 'closed'
+        WHERE status = 'closed'
         ORDER BY exit_time
-    `).all(threeDaysAgo);
+    `).all();
     
     if (trades.length === 0) {
-        await sendTelegramMessage('📊 最近3天内没有已平仓的交易记录');
+        await sendTelegramMessage('📊 没有历史交易记录');
         return;
     }
     
@@ -467,7 +462,7 @@ async function sendHourlyStats() {
     cachedTotalPages = Math.ceil(cachedHourlyStats.length / 6);
     
     if (cachedHourlyStats.length === 0) {
-        await sendTelegramMessage('📊 最近3天内各时段均无交易记录');
+        await sendTelegramMessage('📊 所有时段均无交易记录');
         return;
     }
     
@@ -485,7 +480,7 @@ async function sendHourlyStatsPage(page) {
     const endIdx = Math.min(startIdx + 6, cachedHourlyStats.length);
     const pageStats = cachedHourlyStats.slice(startIdx, endIdx);
     
-    let message = `⏰ 最近3天分时段统计（${page}/${cachedTotalPages}）\n`;
+    let message = `⏰ 全历史分时段统计（${page}/${cachedTotalPages}）\n`;
     message += '══════════════════════════════\n';
     
     pageStats.forEach(stat => {
@@ -517,7 +512,7 @@ async function sendHourlyStatsPage(page) {
         reply_markup: {
             inline_keyboard: [
                 buttons,
-                [{ text: '🔄 重新加载', callback_data: 'show_hourly_stats' },
+                [{ text: '🔄 重新加载', callback_data: 'show_all_hourly_stats' },
                  { text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
             ]
         }
@@ -653,8 +648,8 @@ async function handleCommand(data, chatId) {
   else if (data === 'show_daily_stats') {
     await sendDailyStats();
   }
-  else if (data === 'show_hourly_stats') {
-    await sendHourlyStats();
+  else if (data === 'show_all_hourly_stats') {
+      await sendAllHourlyStats();
   }
   else if (data.startsWith('hourly_page_')) {
       const page = parseInt(data.replace('hourly_page_', ''));
