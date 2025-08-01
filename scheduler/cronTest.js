@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols, getTopLongShortSymbolsTest } = require('../strategy/selectorRun');
-const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest } = require('../binance/trade');
+const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
@@ -37,7 +37,7 @@ async function startSchedulerTest() {
                         // 确定平仓方向（与开仓相反）
                         const closeSide = openTrade.side === 'BUY' ? 'SELL' : 'BUY';
 
-                        await placeOrderTest(
+                        await placeOrderTestNew(
                             openTrade.id,
                             openTrade.symbol,
                             closeSide,
@@ -68,7 +68,7 @@ async function startSchedulerTest() {
                     for (const long of topLong) {
                         try {
                             log(`尝试做多: ${long.symbol}`);
-                            await placeOrderTest(null, long.symbol, 'BUY');
+                            await placeOrderTestNew(null, long.symbol, 'BUY');
                             log(`✅ 做多成功: ${long.symbol}`);
                         } catch (err) {
                             log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
@@ -84,7 +84,7 @@ async function startSchedulerTest() {
                     for (const short of topShort) {
                         try {
                             log(`尝试做空: ${short.symbol}`);
-                            await placeOrderTest(null, short.symbol, 'SELL');
+                            await placeOrderTestNew(null, short.symbol, 'SELL');
                             log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
                             log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
@@ -247,17 +247,17 @@ async function startSchedulerTest() {
     });
 
     // 每12小时执行的任务 - 刷新Top50币种
-    // cron.schedule('0 */12 * * *', async () => {
-    //     try {
-    //         log(`⏰ 开始执行12小时Top50币种刷新任务`);
-    //         await cacheTopSymbols(); // 刷新 Top50 缓存
-    //         await sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
-    //         log(`✅ 12小时Top50币种刷新完成`);
-    //     } catch (err) {
-    //         log(`❌ 刷新Top50币种失败: ${err.message}`);
-    //         await sendTelegramMessage(`⚠️ 刷新Top50币种失败: ${err.message}`);
-    //     }
-    // });
+    cron.schedule('0 */12 * * *', async () => {
+        try {
+            log(`⏰ 开始执行12小时Top50币种刷新任务`);
+            await cacheTopSymbols(); // 刷新 Top50 缓存
+            await sendTelegramMessage('✅ 已刷新24小时交易量 Top50 币种');
+            log(`✅ 12小时Top50币种刷新完成`);
+        } catch (err) {
+            log(`❌ 刷新Top50币种失败: ${err.message}`);
+            await sendTelegramMessage(`⚠️ 刷新Top50币种失败: ${err.message}`);
+        }
+    });
 }
 
 
