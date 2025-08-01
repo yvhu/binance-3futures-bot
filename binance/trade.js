@@ -335,14 +335,14 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   }
   // 四舍五入到指定数量精度
   const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
-  const timestamp = Date.now();
+  // const timestamp = Date.now();
   // 构造市价单请求参数
   const data = new URLSearchParams({
     symbol,
     side,
     type: 'MARKET',
     quantity: Math.abs(qty),
-    timestamp: timestamp.toString()
+    timestamp: Date.now().toString()
   });
 
   // 生成签名
