@@ -247,7 +247,7 @@ async function startSchedulerTest() {
     });
 
     // 每12小时执行的任务 - 刷新Top50币种
-    cron.schedule('0 */12 * * *', async () => {
+    cron.schedule('5 */12 * * *', async () => {
         try {
             log(`⏰ 开始执行12小时Top50币种刷新任务`);
             await cacheTopSymbols(); // 刷新 Top50 缓存
