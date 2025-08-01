@@ -317,12 +317,49 @@ async function fetchKlines(symbol, interval, limit = 2) {
 
 async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol); // 当前市价
-  // await setLeverage(symbol, config.leverage);
-
+  await setLeverage(symbol, config.leverage);
   // 计算下单数量
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
   log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
+
+  // ----接口的操作 开始-----
+  if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
+    log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
+    sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 0，可能因为余额不足或不满足最小下单量`);
+    return;
+  }
+  // === 获取币种精度并格式化数量 ===
+  const precision = getSymbolPrecision(symbol);
+  if (!precision) {
+    throw new Error(`找不到币种 ${symbol} 的精度信息`);
+  }
+  // 四舍五入到指定数量精度
+  const qty = Number(qtyRaw).toFixed(precision.quantityPrecision);
+  const timestamp = Date.now();
+  // 构造市价单请求参数
+  const data = new URLSearchParams({
+    symbol,
+    side,
+    type: 'MARKET',
+    quantity: Math.abs(qty),
+    timestamp: timestamp.toString()
+  });
+
+  // 生成签名
+  const signature = crypto
+    .createHmac('sha256', config.binance.apiSecret)
+    .update(data.toString())
+    .digest('hex');
+
+  const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
+  const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+
+  // ----接口的操作 结束-----
   if (positionAmt) {
+    // 执行市价下单请求
+    const res = await proxyPost(finalUrl, null, { headers });
+    log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
+    sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     // 平仓逻辑
     try {
       // 1. 获取原始交易信息
@@ -361,6 +398,45 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   } else {
     // 开仓逻辑
     try {
+      // 执行市价下单请求
+      const res = await proxyPost(finalUrl, null, { headers });
+      log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
+      sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
+
+      // === 如果是开仓，挂止损单（亏损20%止损） ===
+      // === 止损参数配置 ===
+      if (!positionAmt && enableStopLoss) {
+        const stopSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止损方向与开仓方向相反
+        // 根据开仓方向计算止损触发价格，支持自定义止损比率
+        const stopPrice = side === 'BUY'
+          ? (price * (1 - stopLossRate)).toFixed(precision.pricePrecision)
+          : (price * (1 + stopLossRate)).toFixed(precision.pricePrecision);
+
+        // 计算收益率（亏损比例）
+        const profitLossRate = side === 'BUY'
+          ? ((stopPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止损：亏损比例
+          : ((1 - stopPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止损：亏损比例
+
+        const stopParams = new URLSearchParams({
+          symbol,
+          side: stopSide,
+          type: 'STOP_MARKET',
+          stopPrice: stopPrice,
+          closePosition: 'true',
+          timestamp: Date.now().toString()
+        });
+
+        const stopSignature = crypto
+          .createHmac('sha256', config.binance.apiSecret)
+          .update(stopParams.toString())
+          .digest('hex');
+
+        const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
+        const stopRes = await proxyPost(stopUrl, null, { headers });
+        log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
+        sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
+      }
+
       const tradeId = trade.recordTrade(db, {
         symbol: symbol,
         price: price,
