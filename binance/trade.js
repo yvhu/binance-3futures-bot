@@ -829,8 +829,10 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
   try {
     const price = await getCurrentPrice(symbol);
     const timestamp = await getServerTime();
+    const localTime = Date.now();
+    log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
     await setLeverage(symbol, config.leverage);
-    
+
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
     log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
 
@@ -866,6 +868,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
     let orderResult;
     try {
       log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
+      log(`finalUrl: ${finalUrl} `);
       orderResult = await proxyPost(finalUrl, null, { headers });
       log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
     } catch (orderError) {
@@ -942,11 +945,11 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     const newTradeId = trade.recordTrade(db, {
       symbol: symbol,
       price: price,
-      qtyRaw: qtyRaw,
+      qtyRaw: qty,
       side: side
     });
 
-    log(`✅ 开仓处理完成: ${symbol} ${side} 数量:${qtyRaw} 价格:${price} 交易ID:${newTradeId}`);
+    log(`✅ 开仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price} 交易ID:${newTradeId}`);
     return { tradeId: newTradeId, symbol, price, qtyRaw, side };
   } catch (err) {
     log(`❌ 开仓处理失败: ${symbol} ${side}, 原因: ${err.message}`);
@@ -981,7 +984,7 @@ async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
 
     const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
     const stopRes = await proxyPost(stopUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
-    
+
     log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
     sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
   } catch (err) {
