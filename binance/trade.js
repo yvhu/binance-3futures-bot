@@ -315,8 +315,15 @@ async function fetchKlines(symbol, interval, limit = 2) {
   }));
 }
 
+async function getServerTime() {
+  const response = await proxyGet(`${BINANCE_API}/fapi/v1/time`);
+  return response.data.serverTime;
+}
+
 async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   const price = await getCurrentPrice(symbol); // 当前市价
+  // 校准时间戳
+  const timestamp = await getServerTime();
   await setLeverage(symbol, config.leverage);
   // 计算下单数量
   const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
@@ -342,7 +349,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
     side,
     type: 'MARKET',
     quantity: Math.abs(qty),
-    timestamp: Date.now().toString()
+    timestamp: timestamp.toString()
   });
 
   // 生成签名
@@ -357,7 +364,6 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   // ----接口的操作 结束-----
   if (positionAmt) {
     // 执行市价下单请求
-    log(`📥 下单开始finalUrl参数： ${finalUrl}`);
     const res = await proxyPost(finalUrl, null, { headers });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
@@ -399,6 +405,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   } else {
     // 开仓逻辑
     try {
+      log(`📥 下单开始finalUrl参数： ${finalUrl}`);
       // 执行市价下单请求
       const res = await proxyPost(finalUrl, null, { headers });
       log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
@@ -424,7 +431,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
           type: 'STOP_MARKET',
           stopPrice: stopPrice,
           closePosition: 'true',
-          timestamp: Date.now().toString()
+          timestamp: timestamp.toString()
         });
 
         const stopSignature = crypto
