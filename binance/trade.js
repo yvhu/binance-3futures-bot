@@ -357,6 +357,7 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
   // ----接口的操作 结束-----
   if (positionAmt) {
     // 执行市价下单请求
+    log(`📥 下单开始finalUrl参数： ${finalUrl}`);
     const res = await proxyPost(finalUrl, null, { headers });
     log(`📥 下单成功 ${side} ${symbol}, 数量: ${qty}`);
     sendTelegramMessage(`✅ 下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
