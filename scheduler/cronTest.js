@@ -84,7 +84,7 @@ async function startSchedulerTest() {
                     for (const short of topShort) {
                         try {
                             log(`尝试做空: ${short.symbol}`);
-                            await placeOrderTestNew(null, short.symbol, 'SELL');
+                            await placeOrderTest(null, short.symbol, 'SELL');
                             log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
                             log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
