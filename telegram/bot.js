@@ -98,7 +98,7 @@ async function sendMainMenu() {
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
     [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
     [{ text: '📊 24小时止损统计', callback_data: 'show_daily_stats' }, { text: '📊 24小时止盈止损统计', callback_data: 'show_daily_stats_other' }],
-    [{ text: '⏰ 全历史时段统计', callback_data: 'show_all_hourly_stats' },],
+    [{ text: '⏰ 全历史时段统计', callback_data: 'show_all_hourly_stats' }, { text: '📊 24小时段盈利/亏损统计', callback_data: 'analyze_hourly_profit_ratios' }],
   ];
 
   const ratioButtons = [
@@ -634,6 +634,135 @@ async function sendHourlyStatsPage(page) {
 }
 
 /**
+ * 统计24个时间段内不同盈利/亏损区间的交易占比
+ * 分析以下8种情况：
+ * 1. 最高点盈利 >10% 的占比
+ * 2. 实际盈利 >10% 的占比
+ * 3. 最高点盈利 5%-10% 的占比
+ * 4. 实际盈利 5%-10% 的占比
+ * 5. 最低点亏损 >10% 的占比
+ * 6. 实际亏损 >10% 的占比
+ * 7. 最低点亏损 5%-10% 的占比
+ * 8. 实际亏损 5%-10% 的占比
+ */
+async function analyzeHourlyProfitRatios() {
+    const bot = require('./state').getBot();
+    const db = require('../db').db;
+    const now = new Date();
+    
+    // 获取所有交易记录（可按需限制时间范围）
+    const allTrades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE status = 'closed'
+        ORDER BY exit_time ASC
+    `).all();
+    
+    if (allTrades.length === 0) {
+        await bot.sendMessage(config.telegram.chatId, '📊 没有可分析的交易记录');
+        return;
+    }
+    
+    // 初始化24小时段的统计对象数组
+    const hourlyStats = Array(24).fill().map((_, hour) => ({
+        hour: `${hour}:00-${hour+1}:00`,
+        totalTrades: 0,
+        // 盈利相关统计
+        highProfitOver10: 0,    // 最高点盈利>10%
+        actualProfitOver10: 0,   // 实际盈利>10%
+        highProfit5To10: 0,     // 最高点盈利5%-10%
+        actualProfit5To10: 0,    // 实际盈利5%-10%
+        // 亏损相关统计
+        lowLossOver10: 0,        // 最低点亏损>10%
+        actualLossOver10: 0,     // 实际亏损>10%
+        lowLoss5To10: 0,         // 最低点亏损5%-10%
+        actualLoss5To10: 0       // 实际亏损5%-10%
+    }));
+    
+    // 分析每笔交易
+    allTrades.forEach(trade => {
+        const exitTime = new Date(trade.exit_time);
+        const hour = exitTime.getHours(); // 获取交易的小时数(0-23)
+        const stats = hourlyStats[hour];
+        stats.totalTrades++;
+        
+        // 计算开仓价值（用于百分比计算）
+        const entryValue = trade.entry_price * trade.quantity;
+        
+        // 计算最高点潜在盈利百分比（10倍杠杆）
+        const maxProfitPct = trade.side === 'BUY' 
+            ? (trade.kline_high - trade.entry_price) / trade.entry_price * 1000 // 10倍杠杆×100
+            : (trade.entry_price - trade.kline_low) / trade.entry_price * 1000;
+        
+        // 计算实际盈利百分比（10倍杠杆）
+        const actualProfitPct = trade.side === 'BUY' 
+            ? (trade.exit_price - trade.entry_price) / trade.entry_price * 1000
+            : (trade.entry_price - trade.exit_price) / trade.entry_price * 1000;
+        
+        // 计算最低点潜在亏损百分比（10倍杠杆）
+        const maxLossPct = trade.side === 'BUY' 
+            ? (trade.entry_price - trade.kline_low) / trade.entry_price * 1000
+            : (trade.kline_high - trade.entry_price) / trade.entry_price * 1000;
+        
+        // 计算实际亏损百分比（10倍杠杆）
+        const actualLossPct = Math.abs(actualProfitPct) * (actualProfitPct < 0 ? 1 : 0);
+        
+        // 统计盈利情况
+        if (maxProfitPct > 10) stats.highProfitOver10++;
+        if (actualProfitPct > 10) stats.actualProfitOver10++;
+        if (maxProfitPct >= 5 && maxProfitPct <= 10) stats.highProfit5To10++;
+        if (actualProfitPct >= 5 && actualProfitPct <= 10) stats.actualProfit5To10++;
+        
+        // 统计亏损情况（只考虑实际亏损的交易）
+        if (actualProfitPct < 0) {
+            if (maxLossPct > 10) stats.lowLossOver10++;
+            if (actualLossPct > 10) stats.actualLossOver10++;
+            if (maxLossPct >= 5 && maxLossPct <= 10) stats.lowLoss5To10++;
+            if (actualLossPct >= 5 && actualLossPct <= 10) stats.actualLoss5To10++;
+        }
+    });
+    
+    // 生成统计消息
+    let message = '📊 24小时时段交易统计分析（10倍杠杆）\n';
+    message += '══════════════════════════════\n';
+    message += '格式说明：\n';
+    message += '时段 | 总交易数 | 最高>10% | 实际>10% | 最高5-10% | 实际5-10%\n';
+    message += '     | 亏损>10% | 实亏>10% | 亏损5-10% | 实亏5-10%\n';
+    message += '══════════════════════════════\n';
+    
+    hourlyStats.forEach(stats => {
+        if (stats.totalTrades === 0) return;
+        
+        // 计算各项占比（百分比）
+        const calcPct = (count) => (count / stats.totalTrades * 100).toFixed(1) + '%';
+        
+        // 第一行：盈利统计
+        message += `${stats.hour.padEnd(8)} | ${stats.totalTrades.toString().padEnd(6)} | `;
+        message += `${calcPct(stats.highProfitOver10).padEnd(6)} | ${calcPct(stats.actualProfitOver10).padEnd(6)} | `;
+        message += `${calcPct(stats.highProfit5To10).padEnd(6)} | ${calcPct(stats.actualProfit5To10)}\n`;
+        
+        // 第二行：亏损统计
+        message += ' '.repeat(10) + '| ';
+        message += `${calcPct(stats.lowLossOver10).padEnd(6)} | ${calcPct(stats.actualLossOver10).padEnd(6)} | `;
+        message += `${calcPct(stats.lowLoss5To10).padEnd(6)} | ${calcPct(stats.actualLoss5To10)}\n`;
+        
+        message += '──────────────────────────────\n';
+    });
+    
+    message += `\n📅 统计时间: ${now.toLocaleString()}`;
+    message += '\n\n说明：百分比基于10倍杠杆计算（1%价格波动=10%本金波动）';
+    
+    await bot.sendMessage(config.telegram.chatId, message, {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '🔄 刷新数据', callback_data: 'show_hourly_stats' }],
+                [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+            ]
+        },
+        parse_mode: 'Markdown'
+    });
+}
+
+/**
  * 处理 Telegram 按钮指令
  * @param {string} data 按钮回调数据
  * @param {number} chatId 用户聊天 ID
@@ -767,6 +896,9 @@ async function handleCommand(data, chatId) {
   }
   else if (data === 'show_all_hourly_stats') {
       await sendAllHourlyStats();
+  }
+  else if (data === 'analyze_hourly_profit_ratios') {
+      await analyzeHourlyProfitRatios();
   }
   else if (data.startsWith('hourly_page_')) {
       const page = parseInt(data.replace('hourly_page_', ''));
