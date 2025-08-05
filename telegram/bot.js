@@ -936,7 +936,7 @@ async function handleCommand(data, chatId) {
     await analyzeHourlyProfitRatios();
   }
   else if (data.startsWith('hourly_stats_page_')) {
-    const page = parseInt(callback_data.split('_')[3]);
+    const page = parseInt(data.split('_')[3]);
     await analyzeHourlyProfitRatios(page);
   }
   else if (data.startsWith('hourly_page_')) {
