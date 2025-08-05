@@ -277,210 +277,210 @@ async function sendSymbolFilterMenu() {
  * 亏损计算采用5%止损限制规则
  */
 async function sendDailyStats() {
-    const bot = require('./state').getBot();
-    const db = require('../db').db;
-    
-    // 计算24小时前的时间
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    
-    // 获取24小时内平仓的交易记录
-    const trades = db.prepare(`
+  const bot = require('./state').getBot();
+  const db = require('../db').db;
+
+  // 计算24小时前的时间
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  // 获取24小时内平仓的交易记录
+  const trades = db.prepare(`
         SELECT * FROM trades 
         WHERE exit_time >= ?
         AND status = 'closed'
         ORDER BY exit_time DESC
     `).all(twentyFourHoursAgo);
-    
-    if (trades.length === 0) {
-        await sendTelegramMessage('📊 近24小时内没有已平仓的交易记录');
-        return;
+
+  if (trades.length === 0) {
+    await sendTelegramMessage('📊 近24小时内没有已平仓的交易记录');
+    return;
+  }
+
+  let totalProfit = 0;
+  let totalLoss = 0;
+  let profitCount = 0;
+  let lossCount = 0;
+  let maxDrawdownPct = 0; // 最大回撤百分比
+  const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
+
+  trades.forEach(trade => {
+    // 计算实际盈亏
+    const actualProfit = trade.side === 'BUY'
+      ? (trade.exit_price - trade.entry_price) * trade.quantity
+      : (trade.entry_price - trade.exit_price) * trade.quantity;
+
+    // 计算最大允许亏损金额（0.5%本金）
+    const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
+
+    let adjustedProfit;
+    if (trade.side === 'BUY') {
+      // 做多：计算最大潜在亏损（开仓价到最低价）
+      const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
+    } else {
+      // 做空：计算最大潜在亏损（最高价到开仓价）
+      const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
     }
-    
-    let totalProfit = 0;
-    let totalLoss = 0;
-    let profitCount = 0;
-    let lossCount = 0;
-    let maxDrawdownPct = 0; // 最大回撤百分比
-    const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
-    
-    trades.forEach(trade => {
-        // 计算实际盈亏
-        const actualProfit = trade.side === 'BUY'
-            ? (trade.exit_price - trade.entry_price) * trade.quantity
-            : (trade.entry_price - trade.exit_price) * trade.quantity;
-        
-        // 计算最大允许亏损金额（0.5%本金）
-        const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
-        
-        let adjustedProfit;
-        if (trade.side === 'BUY') {
-            // 做多：计算最大潜在亏损（开仓价到最低价）
-            const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-        } else {
-            // 做空：计算最大潜在亏损（最高价到开仓价）
-            const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-        }
-        
-        // 统计分类
-        if (adjustedProfit > 0) {
-            totalProfit += adjustedProfit;
-            profitCount++;
-        } else {
-            totalLoss += Math.abs(adjustedProfit);
-            lossCount++;
-            
-            // 计算实际回撤百分比
-            const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity) * 100);
-            if (drawdownPct > maxDrawdownPct) {
-                maxDrawdownPct = drawdownPct;
-            }
-        }
-    });
-    
-    const winRate = trades.length > 0 ? (profitCount / trades.length * 100) : 0;
-    const netProfit = totalProfit - totalLoss;
-    
-    const message = [
-        '📈 24小时交易统计（10倍杠杆，最大亏损0.5%本金）',
-        '══════════════════════════════',
-        `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
-        `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
-        `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
-        `🎯 胜率: ${winRate.toFixed(1)}%`,
-        `⚠️ 最大回撤: ${maxDrawdownPct.toFixed(2)}%本金`,
-        `📝 总交易数: ${trades.length}笔`,
-        '══════════════════════════════',
-        `📅 统计时间: ${now.toLocaleString()}`
-    ].join('\n');
-    
-    await bot.sendMessage(config.telegram.chatId, message, {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🔄 刷新数据', callback_data: 'show_daily_stats' }],
-                [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
-            ]
-        }
-    });
+
+    // 统计分类
+    if (adjustedProfit > 0) {
+      totalProfit += adjustedProfit;
+      profitCount++;
+    } else {
+      totalLoss += Math.abs(adjustedProfit);
+      lossCount++;
+
+      // 计算实际回撤百分比
+      const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity) * 100);
+      if (drawdownPct > maxDrawdownPct) {
+        maxDrawdownPct = drawdownPct;
+      }
+    }
+  });
+
+  const winRate = trades.length > 0 ? (profitCount / trades.length * 100) : 0;
+  const netProfit = totalProfit - totalLoss;
+
+  const message = [
+    '📈 24小时交易统计（10倍杠杆，最大亏损0.5%本金）',
+    '══════════════════════════════',
+    `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
+    `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
+    `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
+    `🎯 胜率: ${winRate.toFixed(1)}%`,
+    `⚠️ 最大回撤: ${maxDrawdownPct.toFixed(2)}%本金`,
+    `📝 总交易数: ${trades.length}笔`,
+    '══════════════════════════════',
+    `📅 统计时间: ${now.toLocaleString()}`
+  ].join('\n');
+
+  await bot.sendMessage(config.telegram.chatId, message, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔄 刷新数据', callback_data: 'show_daily_stats' }],
+        [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+      ]
+    }
+  });
 }
 
 async function sendDailyStatsOther() {
-    const bot = require('./state').getBot();
-    const db = require('../db').db;
-    
-    // 计算24小时前的时间
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    
-    // 获取24小时内平仓的交易记录
-    const trades = db.prepare(`
+  const bot = require('./state').getBot();
+  const db = require('../db').db;
+
+  // 计算24小时前的时间
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  // 获取24小时内平仓的交易记录
+  const trades = db.prepare(`
         SELECT * FROM trades 
         WHERE exit_time >= ?
         AND status = 'closed'
         ORDER BY exit_time DESC
     `).all(twentyFourHoursAgo);
-    
-    if (trades.length === 0) {
-        await sendTelegramMessage('📊 近24小时内没有已平仓的交易记录');
-        return;
+
+  if (trades.length === 0) {
+    await sendTelegramMessage('📊 近24小时内没有已平仓的交易记录');
+    return;
+  }
+
+  let totalProfit = 0;
+  let totalLoss = 0;
+  let profitCount = 0;
+  let lossCount = 0;
+  let maxDrawdownPct = 0; // 最大回撤百分比
+  const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
+  const takeProfitPct = 1.0; // 10倍杠杆下的10%→1.0%本金
+
+  trades.forEach(trade => {
+    // 计算实际盈亏
+    const actualProfit = trade.side === 'BUY'
+      ? (trade.exit_price - trade.entry_price) * trade.quantity
+      : (trade.entry_price - trade.exit_price) * trade.quantity;
+
+    // 计算最大允许亏损金额（0.5%本金）
+    const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
+    // 计算最大允许盈利金额（10%本金）
+    const maxAllowedProfitAmount = trade.entry_price * trade.quantity * takeProfitPct / 100;
+
+    let adjustedProfit;
+    if (trade.side === 'BUY') {
+      // 做多：计算最大潜在亏损（开仓价到最低价）
+      const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
+      // 计算最大潜在盈利（最高价到开仓价）
+      const maxPotentialProfit = (trade.kline_high - trade.entry_price) * trade.quantity;
+
+      // 先检查止损
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
+      // 再检查止盈
+      adjustedProfit = maxPotentialProfit > maxAllowedProfitAmount
+        ? maxAllowedProfitAmount
+        : adjustedProfit;
+    } else {
+      // 做空：计算最大潜在亏损（最高价到开仓价）
+      const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
+      // 计算最大潜在盈利（开仓价到最低价）
+      const maxPotentialProfit = (trade.entry_price - trade.kline_low) * trade.quantity;
+
+      // 先检查止损
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
+      // 再检查止盈
+      adjustedProfit = maxPotentialProfit > maxAllowedProfitAmount
+        ? maxAllowedProfitAmount
+        : adjustedProfit;
     }
-    
-    let totalProfit = 0;
-    let totalLoss = 0;
-    let profitCount = 0;
-    let lossCount = 0;
-    let maxDrawdownPct = 0; // 最大回撤百分比
-    const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
-    const takeProfitPct = 1.0; // 10倍杠杆下的10%→1.0%本金
-    
-    trades.forEach(trade => {
-        // 计算实际盈亏
-        const actualProfit = trade.side === 'BUY'
-            ? (trade.exit_price - trade.entry_price) * trade.quantity
-            : (trade.entry_price - trade.exit_price) * trade.quantity;
-        
-        // 计算最大允许亏损金额（0.5%本金）
-        const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
-        // 计算最大允许盈利金额（10%本金）
-        const maxAllowedProfitAmount = trade.entry_price * trade.quantity * takeProfitPct / 100;
-        
-        let adjustedProfit;
-        if (trade.side === 'BUY') {
-            // 做多：计算最大潜在亏损（开仓价到最低价）
-            const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
-            // 计算最大潜在盈利（最高价到开仓价）
-            const maxPotentialProfit = (trade.kline_high - trade.entry_price) * trade.quantity;
-            
-            // 先检查止损
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-            // 再检查止盈
-            adjustedProfit = maxPotentialProfit > maxAllowedProfitAmount 
-                ? maxAllowedProfitAmount 
-                : adjustedProfit;
-        } else {
-            // 做空：计算最大潜在亏损（最高价到开仓价）
-            const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
-            // 计算最大潜在盈利（开仓价到最低价）
-            const maxPotentialProfit = (trade.entry_price - trade.kline_low) * trade.quantity;
-            
-            // 先检查止损
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-            // 再检查止盈
-            adjustedProfit = maxPotentialProfit > maxAllowedProfitAmount 
-                ? maxAllowedProfitAmount 
-                : adjustedProfit;
-        }
-        
-        // 统计分类
-        if (adjustedProfit > 0) {
-            totalProfit += adjustedProfit;
-            profitCount++;
-        } else {
-            totalLoss += Math.abs(adjustedProfit);
-            lossCount++;
-            
-            // 计算实际回撤百分比
-            const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity) * 100);
-            if (drawdownPct > maxDrawdownPct) {
-                maxDrawdownPct = drawdownPct;
-            }
-        }
-    });
-    
-    const winRate = trades.length > 0 ? (profitCount / trades.length * 100) : 0;
-    const netProfit = totalProfit - totalLoss;
-    
-    const message = [
-        '📈 24小时交易统计（10倍杠杆，止损0.5%/止盈10%本金）',
-        '══════════════════════════════',
-        `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
-        `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
-        `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
-        `🎯 胜率: ${winRate.toFixed(1)}%`,
-        `⚠️ 最大回撤: ${maxDrawdownPct.toFixed(2)}%本金`,
-        `📝 总交易数: ${trades.length}笔`,
-        '══════════════════════════════',
-        `📅 统计时间: ${now.toLocaleString()}`
-    ].join('\n');
-    
-    await bot.sendMessage(config.telegram.chatId, message, {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🔄 刷新数据', callback_data: 'show_daily_stats_other' }],
-                [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
-            ]
-        }
-    });
+
+    // 统计分类
+    if (adjustedProfit > 0) {
+      totalProfit += adjustedProfit;
+      profitCount++;
+    } else {
+      totalLoss += Math.abs(adjustedProfit);
+      lossCount++;
+
+      // 计算实际回撤百分比
+      const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity) * 100);
+      if (drawdownPct > maxDrawdownPct) {
+        maxDrawdownPct = drawdownPct;
+      }
+    }
+  });
+
+  const winRate = trades.length > 0 ? (profitCount / trades.length * 100) : 0;
+  const netProfit = totalProfit - totalLoss;
+
+  const message = [
+    '📈 24小时交易统计（10倍杠杆，止损0.5%/止盈10%本金）',
+    '══════════════════════════════',
+    `💰 总盈利: ${totalProfit.toFixed(2)} USDT (${profitCount}笔)`,
+    `📉 总亏损: ${totalLoss.toFixed(2)} USDT (${lossCount}笔)`,
+    `📊 净盈亏: ${netProfit.toFixed(2)} USDT`,
+    `🎯 胜率: ${winRate.toFixed(1)}%`,
+    `⚠️ 最大回撤: ${maxDrawdownPct.toFixed(2)}%本金`,
+    `📝 总交易数: ${trades.length}笔`,
+    '══════════════════════════════',
+    `📅 统计时间: ${now.toLocaleString()}`
+  ].join('\n');
+
+  await bot.sendMessage(config.telegram.chatId, message, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔄 刷新数据', callback_data: 'show_daily_stats_other' }],
+        [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+      ]
+    }
+  });
 }
 
 // 全局变量存储小时统计数据
@@ -491,97 +491,97 @@ let cachedTotalPages = 1;
  * 发送所有历史数据按小时分组的交易统计数据
  */
 async function sendAllHourlyStats() {
-    const bot = require('./state').getBot();
-    const db = require('../db').db;
-    
-    // 获取所有历史交易记录
-    const trades = db.prepare(`
+  const bot = require('./state').getBot();
+  const db = require('../db').db;
+
+  // 获取所有历史交易记录
+  const trades = db.prepare(`
         SELECT * FROM trades 
         WHERE status = 'closed'
         ORDER BY exit_time
     `).all();
-    
-    if (trades.length === 0) {
-        await sendTelegramMessage('📊 没有历史交易记录');
-        return;
+
+  if (trades.length === 0) {
+    await sendTelegramMessage('📊 没有历史交易记录');
+    return;
+  }
+
+  // 按小时分组（0-23）
+  const hourlyStats = {};
+  const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
+
+  // 初始化24个小时的空统计
+  for (let hour = 0; hour < 24; hour++) {
+    hourlyStats[hour] = {
+      hour: `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`,
+      totalProfit: 0,
+      totalLoss: 0,
+      profitCount: 0,
+      lossCount: 0,
+      maxDrawdownPct: 0,
+      totalTrades: 0
+    };
+  }
+
+  // 处理每笔交易
+  trades.forEach(trade => {
+    const exitTime = new Date(trade.exit_time);
+    const hour = exitTime.getHours(); // 获取小时数（0-23）
+
+    // 计算实际盈亏
+    const actualProfit = trade.side === 'BUY'
+      ? (trade.exit_price - trade.entry_price) * trade.quantity
+      : (trade.entry_price - trade.exit_price) * trade.quantity;
+
+    // 计算最大允许亏损金额（0.5%本金）
+    const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
+
+    let adjustedProfit;
+    if (trade.side === 'BUY') {
+      // 做多：计算最大潜在亏损（开仓价到最低价）
+      const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
+    } else {
+      // 做空：计算最大潜在亏损（最高价到开仓价）
+      const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
+      adjustedProfit = maxPotentialLoss > maxAllowedLossAmount
+        ? -maxAllowedLossAmount
+        : actualProfit;
     }
-    
-    // 按小时分组（0-23）
-    const hourlyStats = {};
-    const maxAllowedLossPct = 0.5; // 10倍杠杆下的5%→0.5%本金
-    
-    // 初始化24个小时的空统计
-    for (let hour = 0; hour < 24; hour++) {
-        hourlyStats[hour] = {
-            hour: `${hour.toString().padStart(2, '0')}:00-${(hour + 1).toString().padStart(2, '0')}:00`,
-            totalProfit: 0,
-            totalLoss: 0,
-            profitCount: 0,
-            lossCount: 0,
-            maxDrawdownPct: 0,
-            totalTrades: 0
-        };
+
+    // 更新小时统计
+    if (adjustedProfit > 0) {
+      hourlyStats[hour].totalProfit += adjustedProfit;
+      hourlyStats[hour].profitCount++;
+    } else {
+      hourlyStats[hour].totalLoss += Math.abs(adjustedProfit);
+      hourlyStats[hour].lossCount++;
+
+      // 计算实际回撤百分比
+      const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity)) * 100;
+      if (drawdownPct > hourlyStats[hour].maxDrawdownPct) {
+        hourlyStats[hour].maxDrawdownPct = drawdownPct;
+      }
     }
-    
-    // 处理每笔交易
-    trades.forEach(trade => {
-        const exitTime = new Date(trade.exit_time);
-        const hour = exitTime.getHours(); // 获取小时数（0-23）
-        
-        // 计算实际盈亏
-        const actualProfit = trade.side === 'BUY'
-            ? (trade.exit_price - trade.entry_price) * trade.quantity
-            : (trade.entry_price - trade.exit_price) * trade.quantity;
-        
-        // 计算最大允许亏损金额（0.5%本金）
-        const maxAllowedLossAmount = trade.entry_price * trade.quantity * maxAllowedLossPct / 100;
-        
-        let adjustedProfit;
-        if (trade.side === 'BUY') {
-            // 做多：计算最大潜在亏损（开仓价到最低价）
-            const maxPotentialLoss = (trade.entry_price - trade.kline_low) * trade.quantity;
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-        } else {
-            // 做空：计算最大潜在亏损（最高价到开仓价）
-            const maxPotentialLoss = (trade.kline_high - trade.entry_price) * trade.quantity;
-            adjustedProfit = maxPotentialLoss > maxAllowedLossAmount 
-                ? -maxAllowedLossAmount 
-                : actualProfit;
-        }
-        
-        // 更新小时统计
-        if (adjustedProfit > 0) {
-            hourlyStats[hour].totalProfit += adjustedProfit;
-            hourlyStats[hour].profitCount++;
-        } else {
-            hourlyStats[hour].totalLoss += Math.abs(adjustedProfit);
-            hourlyStats[hour].lossCount++;
-            
-            // 计算实际回撤百分比
-            const drawdownPct = (Math.abs(adjustedProfit) / (trade.entry_price * trade.quantity)) * 100;
-            if (drawdownPct > hourlyStats[hour].maxDrawdownPct) {
-                hourlyStats[hour].maxDrawdownPct = drawdownPct;
-            }
-        }
-        hourlyStats[hour].totalTrades++;
-    });
-    
-    // 过滤掉没有交易的小时段并排序
-    cachedHourlyStats = Object.values(hourlyStats)
-        .filter(h => h.totalTrades > 0)
-        .sort((a, b) => parseInt(a.hour.split(':')[0]) - parseInt(b.hour.split(':')[0]));
-    
-    cachedTotalPages = Math.ceil(cachedHourlyStats.length / 6);
-    
-    if (cachedHourlyStats.length === 0) {
-        await sendTelegramMessage('📊 所有时段均无交易记录');
-        return;
-    }
-    
-    // 发送第一页
-    await sendHourlyStatsPage(1);
+    hourlyStats[hour].totalTrades++;
+  });
+
+  // 过滤掉没有交易的小时段并排序
+  cachedHourlyStats = Object.values(hourlyStats)
+    .filter(h => h.totalTrades > 0)
+    .sort((a, b) => parseInt(a.hour.split(':')[0]) - parseInt(b.hour.split(':')[0]));
+
+  cachedTotalPages = Math.ceil(cachedHourlyStats.length / 6);
+
+  if (cachedHourlyStats.length === 0) {
+    await sendTelegramMessage('📊 所有时段均无交易记录');
+    return;
+  }
+
+  // 发送第一页
+  await sendHourlyStatsPage(1);
 }
 
 /**
@@ -589,48 +589,48 @@ async function sendAllHourlyStats() {
  * @param {number} page 当前页码
  */
 async function sendHourlyStatsPage(page) {
-    const bot = require('./state').getBot();
-    const startIdx = (page - 1) * 6;
-    const endIdx = Math.min(startIdx + 6, cachedHourlyStats.length);
-    const pageStats = cachedHourlyStats.slice(startIdx, endIdx);
-    
-    let message = `⏰ 全历史分时段统计（${page}/${cachedTotalPages}）\n`;
+  const bot = require('./state').getBot();
+  const startIdx = (page - 1) * 6;
+  const endIdx = Math.min(startIdx + 6, cachedHourlyStats.length);
+  const pageStats = cachedHourlyStats.slice(startIdx, endIdx);
+
+  let message = `⏰ 全历史分时段统计（${page}/${cachedTotalPages}）\n`;
+  message += '══════════════════════════════\n';
+
+  pageStats.forEach(stat => {
+    const netProfit = stat.totalProfit - stat.totalLoss;
+    const winRate = stat.totalTrades > 0
+      ? (stat.profitCount / stat.totalTrades * 100)
+      : 0;
+
+    message += `🕒 ${stat.hour}\n`;
+    message += `├─ 净盈亏: ${netProfit.toFixed(2)} USDT\n`;
+    message += `├─ 交易数: ${stat.totalTrades}笔\n`;
+    message += `├─ 胜率: ${winRate.toFixed(1)}%\n`;
+    message += `└─ 最大回撤: ${stat.maxDrawdownPct.toFixed(2)}%本金\n`;
     message += '══════════════════════════════\n';
-    
-    pageStats.forEach(stat => {
-        const netProfit = stat.totalProfit - stat.totalLoss;
-        const winRate = stat.totalTrades > 0 
-            ? (stat.profitCount / stat.totalTrades * 100) 
-            : 0;
-        
-        message += `🕒 ${stat.hour}\n`;
-        message += `├─ 净盈亏: ${netProfit.toFixed(2)} USDT\n`;
-        message += `├─ 交易数: ${stat.totalTrades}笔\n`;
-        message += `├─ 胜率: ${winRate.toFixed(1)}%\n`;
-        message += `└─ 最大回撤: ${stat.maxDrawdownPct.toFixed(2)}%本金\n`;
-        message += '══════════════════════════════\n';
-    });
-    
-    message += `📌 10倍杠杆，最大亏损0.5%本金/笔`;
-    
-    // 分页按钮
-    const buttons = [];
-    if (page > 1) {
-        buttons.push({ text: '◀ 上一页', callback_data: `hourly_page_${page - 1}` });
+  });
+
+  message += `📌 10倍杠杆，最大亏损0.5%本金/笔`;
+
+  // 分页按钮
+  const buttons = [];
+  if (page > 1) {
+    buttons.push({ text: '◀ 上一页', callback_data: `hourly_page_${page - 1}` });
+  }
+  if (page < cachedTotalPages) {
+    buttons.push({ text: '下一页 ▶', callback_data: `hourly_page_${page + 1}` });
+  }
+
+  await bot.sendMessage(config.telegram.chatId, message, {
+    reply_markup: {
+      inline_keyboard: [
+        buttons,
+        [{ text: '🔄 重新加载', callback_data: 'show_all_hourly_stats' },
+        { text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+      ]
     }
-    if (page < cachedTotalPages) {
-        buttons.push({ text: '下一页 ▶', callback_data: `hourly_page_${page + 1}` });
-    }
-    
-    await bot.sendMessage(config.telegram.chatId, message, {
-        reply_markup: {
-            inline_keyboard: [
-                buttons,
-                [{ text: '🔄 重新加载', callback_data: 'show_all_hourly_stats' },
-                 { text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
-            ]
-        }
-    });
+  });
 }
 
 /**
@@ -645,129 +645,156 @@ async function sendHourlyStatsPage(page) {
  * 7. 最低点亏损 5%-10% 的占比
  * 8. 实际亏损 5%-10% 的占比
  */
-async function analyzeHourlyProfitRatios() {
-    const bot = require('./state').getBot();
-    const db = require('../db').db;
-    const now = new Date();
-    
-    // 获取所有交易记录
-    const allTrades = db.prepare(`
+async function analyzeHourlyProfitRatios(page = 0) {
+  const bot = require('./state').getBot();
+  const db = require('../db').db;
+  const now = new Date();
+
+  // 获取所有交易记录
+  const allTrades = db.prepare(`
         SELECT * FROM trades 
         WHERE status = 'closed'
         ORDER BY exit_time ASC
     `).all();
-    
-    if (allTrades.length === 0) {
-        await bot.sendMessage(config.telegram.chatId, '📊 没有可分析的交易记录');
-        return;
+
+  if (allTrades.length === 0) {
+    await bot.sendMessage(config.telegram.chatId, '📊 没有可分析的交易记录');
+    return;
+  }
+
+  // 初始化24小时段的统计对象
+  const hourlyStats = Array(24).fill().map((_, hour) => ({
+    hour: `${hour}:00-${hour + 1}:00`,
+    totalTrades: 0,
+    // 盈利统计
+    profitStats: {
+      highOver10: 0,    // 最高点盈利>10%
+      actualOver10: 0,  // 实际盈利>10%
+      high5To10: 0,     // 最高点盈利5%-10%
+      actual5To10: 0,   // 实际盈利5%-10%
+    },
+    // 亏损统计
+    lossStats: {
+      lowOver10: 0,     // 最低点亏损>10%
+      actualOver10: 0,  // 实际亏损>10%
+      low5To10: 0,     // 最低点亏损5%-10%
+      actual5To10: 0    // 实际亏损5%-10%
     }
-    
-    // 初始化24小时段的统计对象
-    const hourlyStats = Array(24).fill().map((_, hour) => ({
-        hour: `${hour}:00-${hour+1}:00`,
-        totalTrades: 0,
-        // 盈利统计
-        profitStats: {
-            highOver10: 0,    // 最高点盈利>10%
-            actualOver10: 0,  // 实际盈利>10%
-            high5To10: 0,     // 最高点盈利5%-10%
-            actual5To10: 0,   // 实际盈利5%-10%
-        },
-        // 亏损统计
-        lossStats: {
-            lowOver10: 0,     // 最低点亏损>10%
-            actualOver10: 0,  // 实际亏损>10%
-            low5To10: 0,     // 最低点亏损5%-10%
-            actual5To10: 0    // 实际亏损5%-10%
-        }
-    }));
-    
-    // 分析每笔交易
-    allTrades.forEach(trade => {
-        const exitTime = new Date(trade.exit_time);
-        const hour = exitTime.getHours();
-        const stats = hourlyStats[hour];
-        stats.totalTrades++;
-        
-        // 计算开仓价值
-        const entryValue = trade.entry_price * trade.quantity;
-        
-        // 计算各类百分比（10倍杠杆）
-        const maxProfitPct = trade.side === 'BUY' 
-            ? (trade.kline_high - trade.entry_price) / trade.entry_price * 1000
-            : (trade.entry_price - trade.kline_low) / trade.entry_price * 1000;
-        
-        const actualProfitPct = trade.side === 'BUY' 
-            ? (trade.exit_price - trade.entry_price) / trade.entry_price * 1000
-            : (trade.entry_price - trade.exit_price) / trade.entry_price * 1000;
-        
-        const maxLossPct = trade.side === 'BUY' 
-            ? (trade.entry_price - trade.kline_low) / trade.entry_price * 1000
-            : (trade.kline_high - trade.entry_price) / trade.entry_price * 1000;
-        
-        const actualLossPct = Math.abs(actualProfitPct) * (actualProfitPct < 0 ? 1 : 0);
-        
-        // 统计盈利情况
-        if (maxProfitPct > 10) stats.profitStats.highOver10++;
-        if (actualProfitPct > 10) stats.profitStats.actualOver10++;
-        if (maxProfitPct >= 5 && maxProfitPct <= 10) stats.profitStats.high5To10++;
-        if (actualProfitPct >= 5 && actualProfitPct <= 10) stats.profitStats.actual5To10++;
-        
-        // 统计亏损情况
-        if (actualProfitPct < 0) {
-            if (maxLossPct > 10) stats.lossStats.lowOver10++;
-            if (actualLossPct > 10) stats.lossStats.actualOver10++;
-            if (maxLossPct >= 5 && maxLossPct <= 10) stats.lossStats.low5To10++;
-            if (actualLossPct >= 5 && actualLossPct <= 10) stats.lossStats.actual5To10++;
-        }
-    });
-    
-    // 生成更易读的统计消息
-    let message = '📈 24小时交易时段分析（10倍杠杆）\n';
-    message += '══════════════════════════════\n';
-    message += '🔍 说明：\n';
-    message += '- 最高盈利：K线期间达到的最大潜在盈利\n';
-    message += '- 实际盈利：平仓时的实际盈利\n';
-    message += '- 所有百分比基于10倍杠杆计算\n';
-    message += '══════════════════════════════\n\n';
-    
-    hourlyStats.forEach(stats => {
-        if (stats.totalTrades === 0) return;
-        
-        // 计算各项占比
-        const calcPct = (count) => (count / stats.totalTrades * 100).toFixed(1);
-        
-        message += `⏰ 时段 ${stats.hour} (${stats.totalTrades}笔交易)\n`;
-        
-        // 盈利部分
-        message += '  🟢 盈利情况:\n';
-        message += `  - 最高盈利 >10%: ${calcPct(stats.profitStats.highOver10)}%\n`;
-        message += `  - 实际盈利 >10%: ${calcPct(stats.profitStats.actualOver10)}%\n`;
-        message += `  - 最高盈利 5%-10%: ${calcPct(stats.profitStats.high5To10)}%\n`;
-        message += `  - 实际盈利 5%-10%: ${calcPct(stats.profitStats.actual5To10)}%\n`;
-        
-        // 亏损部分
-        message += '  🔴 亏损情况:\n';
-        message += `  - 最大亏损 >10%: ${calcPct(stats.lossStats.lowOver10)}%\n`;
-        message += `  - 实际亏损 >10%: ${calcPct(stats.lossStats.actualOver10)}%\n`;
-        message += `  - 最大亏损 5%-10%: ${calcPct(stats.lossStats.low5To10)}%\n`;
-        message += `  - 实际亏损 5%-10%: ${calcPct(stats.lossStats.actual5To10)}%\n`;
-        
-        message += '────────────────────\n';
-    });
-    
-    message += `\n📅 统计截止时间: ${now.toLocaleString()}`;
-    
-    await bot.sendMessage(config.telegram.chatId, message, {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🔄 刷新数据', callback_data: 'show_hourly_stats' }],
-                [{ text: '📊 查看图表', callback_data: 'show_hourly_chart' }],
-                [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
-            ]
-        },
-        parse_mode: 'Markdown'
-    });
+  }));
+
+  // 分析每笔交易
+  allTrades.forEach(trade => {
+    const exitTime = new Date(trade.exit_time);
+    const hour = exitTime.getHours();
+    const stats = hourlyStats[hour];
+    stats.totalTrades++;
+
+    // 计算开仓价值
+    const entryValue = trade.entry_price * trade.quantity;
+
+    // 计算各类百分比（10倍杠杆）
+    const maxProfitPct = trade.side === 'BUY'
+      ? (trade.kline_high - trade.entry_price) / trade.entry_price * 1000
+      : (trade.entry_price - trade.kline_low) / trade.entry_price * 1000;
+
+    const actualProfitPct = trade.side === 'BUY'
+      ? (trade.exit_price - trade.entry_price) / trade.entry_price * 1000
+      : (trade.entry_price - trade.exit_price) / trade.entry_price * 1000;
+
+    const maxLossPct = trade.side === 'BUY'
+      ? (trade.entry_price - trade.kline_low) / trade.entry_price * 1000
+      : (trade.kline_high - trade.entry_price) / trade.entry_price * 1000;
+
+    const actualLossPct = Math.abs(actualProfitPct) * (actualProfitPct < 0 ? 1 : 0);
+
+    // 统计盈利情况
+    if (maxProfitPct > 10) stats.profitStats.highOver10++;
+    if (actualProfitPct > 10) stats.profitStats.actualOver10++;
+    if (maxProfitPct >= 5 && maxProfitPct <= 10) stats.profitStats.high5To10++;
+    if (actualProfitPct >= 5 && actualProfitPct <= 10) stats.profitStats.actual5To10++;
+
+    // 统计亏损情况
+    if (actualProfitPct < 0) {
+      if (maxLossPct > 10) stats.lossStats.lowOver10++;
+      if (actualLossPct > 10) stats.lossStats.actualOver10++;
+      if (maxLossPct >= 5 && maxLossPct <= 10) stats.lossStats.low5To10++;
+      if (actualLossPct >= 5 && actualLossPct <= 10) stats.lossStats.actual5To10++;
+    }
+  });
+
+  // 分页设置 - 每页显示6个小时段
+  const itemsPerPage = 6;
+  const totalPages = Math.ceil(hourlyStats.length / itemsPerPage);
+  const startIndex = page * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, hourlyStats.length);
+  const currentPageStats = hourlyStats.slice(startIndex, endIndex);
+
+  // 生成更易读的统计消息
+  let message = '📈 24小时交易时段分析（10倍杠杆）\n';
+  message += '══════════════════════════════\n';
+  message += `📑 页码: ${page + 1}/${totalPages}\n`;
+  message += '🔍 说明：\n';
+  message += '- 最高盈利：K线期间达到的最大潜在盈利\n';
+  message += '- 实际盈利：平仓时的实际盈利\n';
+  message += '- 所有百分比基于10倍杠杆计算\n';
+  message += '══════════════════════════════\n\n';
+
+  currentPageStats.forEach(stats => {
+    if (stats.totalTrades === 0) {
+      message += `⏰ 时段 ${stats.hour} (无交易数据)\n`;
+      message += '────────────────────\n';
+      return;
+    }
+
+    // 计算各项占比
+    const calcPct = (count) => (count / stats.totalTrades * 100).toFixed(1);
+
+    message += `⏰ 时段 ${stats.hour} (${stats.totalTrades}笔交易)\n`;
+
+    // 盈利部分
+    message += '  🟢 盈利情况:\n';
+    message += `  - 最高盈利 >10%: ${calcPct(stats.profitStats.highOver10)}%\n`;
+    message += `  - 实际盈利 >10%: ${calcPct(stats.profitStats.actualOver10)}%\n`;
+    message += `  - 最高盈利 5%-10%: ${calcPct(stats.profitStats.high5To10)}%\n`;
+    message += `  - 实际盈利 5%-10%: ${calcPct(stats.profitStats.actual5To10)}%\n`;
+
+    // 亏损部分
+    message += '  🔴 亏损情况:\n';
+    message += `  - 最大亏损 >10%: ${calcPct(stats.lossStats.lowOver10)}%\n`;
+    message += `  - 实际亏损 >10%: ${calcPct(stats.lossStats.actualOver10)}%\n`;
+    message += `  - 最大亏损 5%-10%: ${calcPct(stats.lossStats.low5To10)}%\n`;
+    message += `  - 实际亏损 5%-10%: ${calcPct(stats.lossStats.actual5To10)}%\n`;
+
+    message += '────────────────────\n';
+  });
+
+  message += `\n📅 统计截止时间: ${now.toLocaleString()}`;
+
+  // 构建分页按钮
+  const paginationButtons = [];
+  if (page > 0) {
+    paginationButtons.push({ text: '⬅️ 上一页', callback_data: `hourly_stats_page_${page - 1}` });
+  }
+  if (page < totalPages - 1) {
+    paginationButtons.push({ text: '➡️ 下一页', callback_data: `hourly_stats_page_${page + 1}` });
+  }
+
+  const keyboard = [];
+  if (paginationButtons.length > 0) {
+    keyboard.push(paginationButtons);
+  }
+  keyboard.push(
+    [{ text: '🔄 刷新数据', callback_data: `hourly_stats_page_${page}` }],
+    [{ text: '📊 查看图表', callback_data: 'show_hourly_chart' }],
+    [{ text: '🔙 返回主菜单', callback_data: 'back_to_main' }]
+  );
+
+  await bot.sendMessage(config.telegram.chatId, message, {
+    reply_markup: {
+      inline_keyboard: keyboard
+    },
+    parse_mode: 'Markdown'
+  });
 }
 
 /**
@@ -903,19 +930,23 @@ async function handleCommand(data, chatId) {
     await sendDailyStatsOther();
   }
   else if (data === 'show_all_hourly_stats') {
-      await sendAllHourlyStats();
+    await sendAllHourlyStats();
   }
   else if (data === 'analyze_hourly_profit_ratios') {
-      await analyzeHourlyProfitRatios();
+    await analyzeHourlyProfitRatios();
+  }
+  else if (data.startsWith('hourly_stats_page_')) {
+    const page = parseInt(callback_data.split('_')[3]);
+    await analyzeHourlyProfitRatios(page);
   }
   else if (data.startsWith('hourly_page_')) {
-      const page = parseInt(data.replace('hourly_page_', ''));
-      if (page >= 1 && page <= cachedTotalPages) {
-          await sendHourlyStatsPage(page);
-      } else {
-          await sendTelegramMessage('⚠️ 页码无效，正在返回第一页');
-          await sendHourlyStatsPage(1);
-      }
+    const page = parseInt(data.replace('hourly_page_', ''));
+    if (page >= 1 && page <= cachedTotalPages) {
+      await sendHourlyStatsPage(page);
+    } else {
+      await sendTelegramMessage('⚠️ 页码无效，正在返回第一页');
+      await sendHourlyStatsPage(1);
+    }
   }
 }
 
