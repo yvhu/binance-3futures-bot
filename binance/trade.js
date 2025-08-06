@@ -126,6 +126,8 @@ async function setLeverage(symbol, leverage) {
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = {'X-MBX-APIKEY': config.binance.apiKey.trim()};
   try {
+    console.log('打印参数url:', url); // 调试输出
+    onsole.log('打印参数headers:', headers); // 调试输出
     const res = await proxyPost(url, null, { headers });
     log(`✅ 设置杠杆成功 ${symbol}：${leverage}x`);
     return res.data;
