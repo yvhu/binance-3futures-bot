@@ -56,7 +56,7 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
 
   } catch (error) {
     console.error(`Failed to fetch klines for ${symbol}:`, error);
-    throw new Error(`Failed to fetch kline data: ${error.message}`);
+    // throw new Error(`Failed to fetch kline data: ${error.message}`);
   }
 }
 
@@ -72,7 +72,7 @@ async function getCurrentPrice(symbol) {
     return parseFloat(res.data.price);
   } catch (error) {
     console.error(`Failed to fetch klines for ${symbol}:`, error);
-    throw new Error(`Failed to get price data: ${error.message}`);
+    // throw new Error(`Failed to get price data: ${error.message}`);
   }
 }
 
