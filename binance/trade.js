@@ -802,6 +802,7 @@ async function fetchAllOpenOrders() {
 }
 
 async function cancelOrder(symbol, orderId) {
+  log(`✅ 撤销${symbol} 单号：${orderId} 止盈止损订单`);
   const params = new URLSearchParams({
     symbol,
     orderId,
@@ -933,7 +934,10 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
     // 5. 准备通知消息（可包含K线信息）
     const message = formatTradeNotification(closedTrade);
 
-    // 6. 发送通知
+    // 6. 撤单止盈止损订单
+    await cancelOrder(symbol, orderResult.orderId)
+
+    // 7. 发送通知
     await sendNotification(message);
 
     log(`✅ 平仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price}`);
