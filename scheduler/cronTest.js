@@ -45,6 +45,7 @@ async function startSchedulerTest() {
                         // );
 
                         if (serviceStatus.running) {
+                            log(`✅ 进入真实交易`);
                             await placeOrderTestNew(
                                 openTrade.id,
                                 openTrade.symbol,
@@ -86,6 +87,7 @@ async function startSchedulerTest() {
                             log(`尝试做多: ${long.symbol}`);
                             // await placeOrderTestNew(null, long.symbol, 'BUY');
                             if (serviceStatus.running) {
+                                log(`✅ 进入真实交易`);
                                 await placeOrderTestNew(null, long.symbol, 'BUY');
                             } else {
                                 await placeOrderTest(null, long.symbol, 'BUY');
@@ -107,6 +109,7 @@ async function startSchedulerTest() {
                             log(`尝试做空: ${short.symbol}`);
                             // await placeOrderTestNew(null, short.symbol, 'SELL');
                             if (serviceStatus.running) {
+                                log(`✅ 进入真实交易`);
                                 await placeOrderTestNew(null, short.symbol, 'SELL');
                             } else {
                                 await placeOrderTest(null, short.symbol, 'SELL');
