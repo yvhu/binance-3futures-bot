@@ -9,7 +9,7 @@ const { log } = require('../utils/logger');
 const { isFlatMarket, dynamicPriceRangeRatio, calculateADX } = require('../utils/flatFilter');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const { getCurrentPrice } = require('../binance/market');
-
+const moment = require('moment-timezone');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -30,6 +30,23 @@ async function fetchKlines(symbol, interval, limit = 50) {
     takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
     ignore: parseFloat(k[11])          // 忽略字段
   }));
+}
+
+function isInTradingTimeRange(timeRanges) {
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const currentTime = currentHours * 100 + currentMinutes; // 转换为数字便于比较 如0930
+
+  return timeRanges.some(range => {
+    const [startHour, startMinute] = range.start.split(':').map(Number);
+    const [endHour, endMinute] = range.end.split(':').map(Number);
+
+    const startTime = startHour * 100 + startMinute;
+    const endTime = endHour * 100 + endMinute;
+
+    return currentTime >= startTime && currentTime <= endTime;
+  });
 }
 
 // 评估一个币种的做多或做空信号，并给出强度评分
@@ -191,14 +208,24 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   // }
 
   // ========== 时间过滤 ==========
-  const now = new Date();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
+  // const now = new Date();
+  // const hours = now.getHours();
+  // const minutes = now.getMinutes();
 
+  const enableTakeProfitByTime = isInTradingTimeRange(config.takeSelectRunTimeRanges);
   // if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
   //   log(`🚫 ${symbol} 当前时段流动性不足`);
   //   return null;
   // }
+  if (!enableTakeProfitByTime) {
+    const serverTime = new Date();
+    const formattedTime = moment(serverTime)
+      .tz(timezone)
+      .format('YYYY年MM月DD日 HH:mm');
+    sendTelegramMessage(`✅ 当前时段流动性不足不开仓 ${new Date()}, 时间段：${formattedTime}`);
+    log(`🚫 ${symbol} 当前时段流动性不足`);
+    return null;
+  }
 
   // ========== 改进后的打分逻辑 ==========
   let longScore = 0;

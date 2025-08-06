@@ -11,6 +11,7 @@ const { getCachedPositionRatio } = require('../utils/cache');
 const { getOrderMode } = require('../utils/state');
 const { db, trade } = require('../db');
 const _ = require('lodash');
+const moment = require('moment-timezone');
 // === 止损参数配置 ===
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
 
@@ -124,7 +125,7 @@ async function setLeverage(symbol, leverage) {
   console.log(`apiSecret: ${config.binance.apiSecret}`); // 应该显示你的有效API密钥 secret
   console.log('生成的签名:', signature); // 调试输出
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
-  const headers = {'X-MBX-APIKEY': config.binance.apiKey.trim()};
+  const headers = { 'X-MBX-APIKEY': config.binance.apiKey.trim() };
   try {
     console.log('打印参数url:', url); // 调试输出
     console.log('打印参数headers:', headers); // 调试输出
@@ -943,6 +944,23 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
   }
 }
 
+function isInTradingTimeRange(timeRanges) {
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const currentTime = currentHours * 100 + currentMinutes; // 转换为数字便于比较 如0930
+
+  return timeRanges.some(range => {
+    const [startHour, startMinute] = range.start.split(':').map(Number);
+    const [endHour, endMinute] = range.end.split(':').map(Number);
+
+    const startTime = startHour * 100 + startMinute;
+    const endTime = endHour * 100 + endMinute;
+
+    return currentTime >= startTime && currentTime <= endTime;
+  });
+}
+
 async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, timestamp, precision, orderResult) {
   try {
     if (orderResult) {
@@ -952,6 +970,17 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     // 设置止损单（如果下单成功且启用止损）
     if (orderResult && !positionAmt && enableStopLoss) {
       await setupStopLossOrder(symbol, side, price, timestamp, precision);
+    }
+    // 设置止盈单（如果下单成功且启用止盈）
+    // 获取当前是否在允许的止盈时段
+    const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
+    const serverTime = new Date();
+    const formattedTime = moment(serverTime)
+    .tz(timezone)
+    .format('YYYY年MM月DD日 HH:mm');
+    sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
+    if (orderResult && !positionAmt && enableTakeProfit && enableTakeProfitByTime) {
+      await setupTakeProfitOrder(symbol, side, price, timestamp, precision);
     }
 
     // 记录交易（无论下单是否成功）
@@ -970,6 +999,41 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
   }
 }
 
+async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
+  try {
+    const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
+    const takeProfitPrice = side === 'BUY'
+      ? (price * (1 + takeProfitRate)).toFixed(precision.pricePrecision)
+      : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
+
+    // 计算收益率（盈利比例）
+    const profitRate = side === 'BUY'
+      ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止盈：盈利比例
+      : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止盈：盈利比例
+
+    const tpParams = new URLSearchParams({
+      symbol,
+      side: takeProfitSide,
+      type: 'TAKE_PROFIT_MARKET',
+      stopPrice: takeProfitPrice,   // 虽然叫 stopPrice，其实这里是触发价
+      closePosition: 'true',
+      timestamp: timestamp.toString()
+    });
+
+    const tpSignature = crypto
+      .createHmac('sha256', config.binance.apiSecret)
+      .update(tpParams.toString())
+      .digest('hex');
+
+    const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
+    const tpRes = await proxyPost(tpUrl, null, { headers });
+
+    log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
+    sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
+  } catch (error) {
+    log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${err.message}`);
+  }
+}
 async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
   try {
     const stopSide = side === 'BUY' ? 'SELL' : 'BUY';

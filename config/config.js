@@ -8,7 +8,7 @@ module.exports = {
   selectionCount: 5,
 
   // 波动率阈值，0.15% 实体视为低波动
-  volatilityExitThreshold: 0.002, 
+  volatilityExitThreshold: 0.002,
 
   // 使用的杠杆倍数（10倍杠杆）
   leverage: 10,
@@ -20,6 +20,61 @@ module.exports = {
     enableTakeProfit: true,      // 是否启用止盈单（预留）
     takeProfitRate: 0.01           // 止盈触发比例（盈利 10% = 0.1）
   },
+
+  takeProfitTimeRanges: [
+    { start: "00:00", end: "01:00" },
+    { start: "01:00", end: "02:00" },
+    { start: "02:00", end: "03:00" },
+    // { start: "03:00", end: "04:00" },
+    { start: "04:00", end: "05:00" },
+    // { start: "05:00", end: "06:00" },
+    { start: "06:00", end: "07:00" },
+    { start: "07:00", end: "08:00" },
+    { start: "08:00", end: "09:00" },
+    { start: "09:00", end: "10:00" },
+    // { start: "10:00", end: "11:00" },
+    { start: "11:00", end: "12:00" },
+    { start: "12:00", end: "13:00" },
+    // { start: "13:00", end: "14:00" },
+    // { start: "14:00", end: "15:00" },
+    // { start: "15:00", end: "16:00" },
+    { start: "16:00", end: "17:00" },
+    // { start: "17:00", end: "18:00" },
+    { start: "18:00", end: "19:00" },
+    { start: "19:00", end: "20:00" },
+    // { start: "20:00", end: "21:00" },
+    // { start: "21:00", end: "22:00" },
+    // { start: "22:00", end: "23:00" },
+    // { start: "23:00", end: "24:00" },
+  ],
+
+  takeSelectRunTimeRanges: [
+    // 注释掉的时间不执行
+    // { start: "00:00", end: "01:00" },
+    // { start: "01:00", end: "02:00" },
+    { start: "02:00", end: "03:00" },
+    { start: "03:00", end: "04:00" },
+    // { start: "04:00", end: "05:00" },
+    { start: "05:00", end: "06:00" },
+    { start: "06:00", end: "07:00" },
+    { start: "07:00", end: "08:00" },
+    // { start: "08:00", end: "09:00" },
+    { start: "09:00", end: "10:00" },
+    { start: "10:00", end: "11:00" },
+    { start: "11:00", end: "12:00" },
+    { start: "12:00", end: "13:00" },
+    // { start: "13:00", end: "14:00" },
+    { start: "14:00", end: "15:00" },
+    { start: "15:00", end: "16:00" },
+    { start: "16:00", end: "17:00" },
+    { start: "17:00", end: "18:00" },
+    { start: "18:00", end: "19:00" },
+    { start: "19:00", end: "20:00" },
+    { start: "20:00", end: "21:00" },
+    // { start: "21:00", end: "22:00" },
+    { start: "22:00", end: "23:00" },
+    { start: "23:00", end: "24:00" },
+  ],
 
   // 横盘逻辑配置
   sidewaysExit: {
