@@ -187,7 +187,7 @@ module.exports = {
   // 缓存文件路径配置
   cachePaths: {
     // Top50 币种列表缓存路径
-    top50: '../cache/top50.json',
+    top50: './cache/top50.json',
     // 用户选择的交易币种缓存路径
     selectedSymbol: '../cache/selected-symbol.json',
     // 新增：币种精度缓存路径
