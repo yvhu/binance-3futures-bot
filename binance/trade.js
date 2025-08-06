@@ -113,7 +113,7 @@ async function setLeverage(symbol, leverage) {
   const params = new URLSearchParams({
     symbol,
     leverage: leverage.toString(),
-    timestamp: localTime.toString()
+    timestamp: String(Date.now()),
   });
   const signature = crypto
     .createHmac('sha256', config.binance.apiSecret.trim()) // 同样trim()处理
@@ -211,7 +211,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
     side,
     type: 'MARKET',
     quantity: Math.abs(qty),
-    timestamp: timestamp.toString()
+    timestamp: String(Date.now()),
   });
 
   // 生成签名
@@ -254,7 +254,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
         type: 'STOP_MARKET',
         stopPrice: stopPrice,
         closePosition: 'true',
-        timestamp: Date.now().toString()
+        timestamp: String(Date.now()),
       });
 
       const stopSignature = crypto
@@ -286,7 +286,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
         type: 'TAKE_PROFIT_MARKET',
         stopPrice: takeProfitPrice,   // 虽然叫 stopPrice，其实这里是触发价
         closePosition: 'true',
-        timestamp: Date.now().toString()
+        timestamp: String(Date.now()),
       });
 
       const tpSignature = crypto
@@ -541,7 +541,7 @@ async function closePositionIfNeeded(symbol) {
         side: exitSide,
         type: 'MARKET',
         quantity: Math.abs(position.positionAmt),
-        timestamp: timestamp.toString(),
+        timestamp: String(Date.now()),
         reduceOnly: 'true',       // 关键参数，确保只减少持仓
       });
 
@@ -597,7 +597,7 @@ async function getAccountTrades(symbol, startTime = 0) {
     const timestamp = Date.now();
     const params = new URLSearchParams({
       symbol,
-      timestamp: timestamp.toString(),
+      timestamp: String(Date.now()),
       limit: '20',   // 最大100条，最大可调整，币安接口限制
     });
     if (startTime > 0) {
@@ -638,7 +638,7 @@ async function getLossIncomes(symbol, startTime, endTime) {
       startTime: startTime.toString(),
       endTime: endTime.toString(),
       limit: '100',
-      timestamp: timestamp.toString(),
+      timestamp: String(Date.now()),
     });
 
     const signature = crypto
@@ -806,7 +806,7 @@ async function cancelOrder(symbol, orderId) {
   const params = new URLSearchParams({
     symbol,
     orderId,
-    timestamp: Date.now()
+    timestamp: String(Date.now()),
   });
   const signature = signParams(params);
   const url = `${config.binance.baseUrl}/fapi/v1/order?${params}&signature=${signature}`;
@@ -816,7 +816,7 @@ async function cancelOrder(symbol, orderId) {
 async function batchCancelOrders(symbol, orderIds) {
   const params = new URLSearchParams({
     symbol,
-    timestamp: Date.now()
+    timestamp: String(Date.now()),
   });
   orderIds.forEach((id, i) => params.append(`orderIdList[${i}]`, id));
 
@@ -868,8 +868,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       side,
       type: 'MARKET',
       quantity: Math.abs(qty),
-      timestamp: String(Date.now()),
-      recvWindow: '60000'
+      timestamp: String(Date.now())
     });
 
     const signature = crypto
@@ -887,12 +886,12 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`finalUrl: ${finalUrl} `);
       orderResult = await proxyPost(finalUrl, null, { headers });
       // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
-      log(`📥 下单请求已发送, 参数:\n${JSON.stringify(orderResult, null, 2)}`);
+      log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
       log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
       // 继续执行后续逻辑，不抛出错误
+      log(`📥 下单请求返回的报错参数:\n${JSON.stringify(orderResult, null, 2)}`);
       orderResult = null;
-      log(`📥 下单请求已发送, 参数:\n${JSON.stringify(orderResult, null, 2)}`);
     }
 
     if (positionAmt) {
@@ -1024,7 +1023,7 @@ async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
       type: 'TAKE_PROFIT_MARKET',
       stopPrice: takeProfitPrice,   // 虽然叫 stopPrice，其实这里是触发价
       closePosition: 'true',
-      timestamp: timestamp.toString()
+      timestamp: String(Date.now()),
     });
 
     const tpSignature = crypto
@@ -1058,7 +1057,7 @@ async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
       type: 'STOP_MARKET',
       stopPrice: stopPrice,
       closePosition: 'true',
-      timestamp: timestamp.toString()
+      timestamp: String(Date.now()),
     });
 
     const stopSignature = crypto
