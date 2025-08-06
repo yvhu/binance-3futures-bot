@@ -1,4 +1,4 @@
-require('dotenv').config({ path: __dirname + '/.env' });
+require('dotenv').config();
 
 module.exports = {
   // 策略使用的K线周期（如3分钟）
@@ -143,7 +143,6 @@ module.exports = {
     patio: './cache/ratio.json'
   }
 };
-
 
 console.log('Environment Variables:', {
   BINANCE_API_KEY: process.env.BINANCE_API_KEY ? '***loaded***' : 'NOT FOUND',
