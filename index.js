@@ -1,4 +1,5 @@
 // index.js - 启动主入口
+require('dotenv').config();
 const { initTelegramBot } = require('./telegram/bot');
 const { startScheduler } = require('./scheduler/cron');
 const { startSchedulerNew } = require('./scheduler/cronNew');

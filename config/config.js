@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 module.exports = {
   // 策略使用的K线周期（如3分钟）
   interval: '15m',
