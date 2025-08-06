@@ -1,17 +1,19 @@
+const fs = require('fs');
+const path = require('path');
+const logFile = path.join(__dirname, 'telegram-test.log');
 const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew } = require('../binance/trade');
 
-
-
-async function getServerTime() {
-  const response = await proxyGet(`${BINANCE_API}/fapi/v1/time`);
-  return response.data.serverTime;
-}
-
 async function testOrder() {
+    const logMessage = (msg) => {
+        const timestamp = new Date().toISOString();
+        const line = `[${timestamp}] ${msg}\n`;
+        fs.appendFileSync(logFile, line);
+        console.log(line.trim());
+    };
+
     try {
         logMessage('=== 开始测试 ===');
-        const timestamp = await getServerTime();
-        
+
         await placeOrderTestNew(null, 'BTC', 'BUY')
 
         logMessage('✅ 消息发送成功');
