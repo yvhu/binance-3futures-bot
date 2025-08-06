@@ -980,8 +980,8 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
     const serverTime = new Date();
     const formattedTime = moment(serverTime)
-    .tz(timezone)
-    .format('YYYY年MM月DD日 HH:mm');
+      .local() // 使用服务器本地时区
+      .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
     if (orderResult && enableTakeProfit && enableTakeProfitByTime) {
       await setupTakeProfitOrder(symbol, side, price, timestamp, precision);

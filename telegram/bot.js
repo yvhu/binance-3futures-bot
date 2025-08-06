@@ -28,7 +28,7 @@ const { getStatsByPage } = require('../db/hourlyStats');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 let serviceStatus = {
-  running: false
+  running: true
 };
 
 // 添加全局变量存储当前分页状态
