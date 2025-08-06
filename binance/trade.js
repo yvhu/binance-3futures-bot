@@ -885,7 +885,8 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
       log(`finalUrl: ${finalUrl} `);
       orderResult = await proxyPost(finalUrl, null, { headers });
-      log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
+      // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
+      log(`📥 下单请求已发送, 参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
       log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
       // 继续执行后续逻辑，不抛出错误
