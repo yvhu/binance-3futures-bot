@@ -34,7 +34,7 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
   try {
     const url = `${BINANCE_API}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
     const response = await proxyGet(url);
-    
+
     if (!response.data || !Array.isArray(response.data)) {
       throw new Error('Invalid response data format');
     }
@@ -53,7 +53,7 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
       takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
       ignore: parseFloat(k[11])          // 忽略字段
     }));
-    
+
   } catch (error) {
     console.error(`Failed to fetch klines for ${symbol}:`, error);
     throw new Error(`Failed to fetch kline data: ${error.message}`);
@@ -66,9 +66,14 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
  * @returns {number} 当前最新成交价
  */
 async function getCurrentPrice(symbol) {
-  const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
-  const res = await proxyGet(url);
-  return parseFloat(res.data.price);
+  try {
+    const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
+    const res = await proxyGet(url);
+    return parseFloat(res.data.price);
+  } catch (error) {
+    console.error(`Failed to fetch klines for ${symbol}:`, error);
+    throw new Error(`Failed to get price data: ${error.message}`);
+  }
 }
 
 module.exports = {
