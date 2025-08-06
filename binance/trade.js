@@ -827,8 +827,11 @@ function signParams(params) {
 
 async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
   try {
+    log('✅ 下单流程开始');
     const price = await getCurrentPrice(symbol);
+    log('✅ 获取价格');
     const timestamp = await getServerTime();
+    log('✅ 获取系统时间');
     const localTime = Date.now();
     log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
     await setLeverage(symbol, config.leverage);
