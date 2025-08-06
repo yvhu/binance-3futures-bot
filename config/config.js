@@ -22,6 +22,7 @@ module.exports = {
   },
 
   takeProfitTimeRanges: [
+    // 未注释的时间执行止盈操作
     { start: "00:00", end: "01:00" },
     { start: "01:00", end: "02:00" },
     { start: "02:00", end: "03:00" },
