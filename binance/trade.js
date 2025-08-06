@@ -868,7 +868,8 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       side,
       type: 'MARKET',
       quantity: Math.abs(qty),
-      timestamp: localTime.toString()
+      timestamp: String(Date.now()),
+      recvWindow: '60000'
     });
 
     const signature = crypto
@@ -891,6 +892,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
       // 继续执行后续逻辑，不抛出错误
       orderResult = null;
+      log(`📥 下单请求已发送, 参数:\n${JSON.stringify(orderResult, null, 2)}`);
     }
 
     if (positionAmt) {
