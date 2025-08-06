@@ -37,7 +37,7 @@ async function startSchedulerTest() {
                         // 确定平仓方向（与开仓相反）
                         const closeSide = openTrade.side === 'BUY' ? 'SELL' : 'BUY';
 
-                        await placeOrderTestNew(
+                        await placeOrderTest(
                             openTrade.id,
                             openTrade.symbol,
                             closeSide,
@@ -68,7 +68,7 @@ async function startSchedulerTest() {
                     for (const long of topLong) {
                         try {
                             log(`尝试做多: ${long.symbol}`);
-                            await placeOrderTestNew(null, long.symbol, 'BUY');
+                            await placeOrderTest(null, long.symbol, 'BUY');
                             log(`✅ 做多成功: ${long.symbol}`);
                         } catch (err) {
                             log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
@@ -84,7 +84,7 @@ async function startSchedulerTest() {
                     for (const short of topShort) {
                         try {
                             log(`尝试做空: ${short.symbol}`);
-                            await placeOrderTestNew(null, short.symbol, 'SELL');
+                            await placeOrderTest(null, short.symbol, 'SELL');
                             log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
                             log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
