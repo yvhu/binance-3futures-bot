@@ -116,8 +116,9 @@ async function setLeverage(symbol, leverage) {
     .update(params.toString())
     .digest('hex');
   // 检查你的 config.binance 配置是否正确
-  console.log(config.binance.apiKey); // 应该显示你的有效API密钥
-  console.log(config.binance.apiSecret); // 应该显示你的有效API密钥 secret
+  console.log(`打印杠杆倍数：${config.leverage}`);
+  console.log(`apiKey: ${config.binance.apiKey}`); // 应该显示你的有效API密钥
+  console.log(`apiSecret: ${config.binance.apiSecret}`); // 应该显示你的有效API密钥 secret
   console.log('生成的签名:', signature); // 调试输出
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = {
@@ -863,7 +864,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       side,
       type: 'MARKET',
       quantity: Math.abs(qty),
-      timestamp: timestamp.toString()
+      timestamp: localTime.toString()
     });
 
     const signature = crypto
@@ -892,7 +893,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       return await handleClosePosition(tradeId, symbol, side, qty, price, orderResult);
     } else {
       // 开仓逻辑
-      return await handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, timestamp, precision, orderResult);
+      return await handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, localTime, precision, orderResult);
     }
   } catch (error) {
     log(`❌ 下单流程出现异常: ${symbol} ${side}, 原因: ${error.message}`);
