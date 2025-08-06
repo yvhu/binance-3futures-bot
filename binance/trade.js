@@ -968,7 +968,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     }
 
     // 设置止损单（如果下单成功且启用止损）
-    if (orderResult && !positionAmt && enableStopLoss) {
+    if (orderResult && enableStopLoss) {
       await setupStopLossOrder(symbol, side, price, timestamp, precision);
     }
     // 设置止盈单（如果下单成功且启用止盈）
@@ -979,7 +979,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     .tz(timezone)
     .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
-    if (orderResult && !positionAmt && enableTakeProfit && enableTakeProfitByTime) {
+    if (orderResult && enableTakeProfit && enableTakeProfitByTime) {
       await setupTakeProfitOrder(symbol, side, price, timestamp, precision);
     }
 
