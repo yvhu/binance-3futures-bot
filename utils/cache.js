@@ -119,6 +119,11 @@ function removeFromTopSymbols(symbol) {
 
 // 获取某币种的精度信息
 const getSymbolPrecision = (symbol) => {
+  console.log('缓存文件路径:', config.cachePaths.precision); // 调试输出路径
+  if (!fs.existsSync(config.cachePaths.precision)) {
+    console.error('❌ 缓存文件不存在:', config.cachePaths.precision);
+    return null;
+  }
   if (!fs.existsSync(config.cachePaths.precision)) return null;
   const data = JSON.parse(fs.readFileSync(config.cachePaths.precision));
   return data[symbol] || null;
