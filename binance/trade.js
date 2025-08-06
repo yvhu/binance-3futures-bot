@@ -888,22 +888,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
       log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
-      const errorResponse = {
-        request: {
-          symbol,
-          side,
-          positionAmt,
-          url: finalUrl.split('?')[0] // 脱敏
-        },
-        error: {
-          message: orderError.message,
-          code: orderError.response?.data?.code || 'N/A',
-          detail: orderError.response?.data?.msg || '无详细错误信息',
-          fullError: orderError.response?.data || {} // 完整错误对象
-        }
-      };
-
-      log(`❌ 下单失败详情:\n${JSON.stringify(errorResponse, null, 2)}`);
+      log(`❌ 下单失败详情: ${orderError.message}`);
       orderResult = null;
     }
 
@@ -987,7 +972,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     }
 
     // 设置止损单（如果下单成功且启用止损）
-    if (orderResult && enableStopLoss) {
+    if (enableStopLoss) {
       await setupStopLossOrder(symbol, side, price, timestamp, precision);
     }
     // 设置止盈单（如果下单成功且启用止盈）
@@ -998,7 +983,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       .local() // 使用服务器本地时区
       .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
-    if (orderResult && enableTakeProfit && enableTakeProfitByTime) {
+    if (enableTakeProfit && enableTakeProfitByTime) {
       await setupTakeProfitOrder(symbol, side, price, timestamp, precision);
     }
 
