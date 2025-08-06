@@ -888,7 +888,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
       log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
-      log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
+      // log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
       // 继续执行后续逻辑，不抛出错误
       log(`📥 下单请求返回的报错参数:\n${JSON.stringify(orderResult, null, 2)}`);
       orderResult = null;
