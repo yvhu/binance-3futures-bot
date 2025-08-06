@@ -1,4 +1,5 @@
 // index.js - 启动主入口
+require('dotenv').config(); // 加载 .env 文件
 const { initTelegramBot } = require('./telegram/bot');
 const { startScheduler } = require('./scheduler/cron');
 const { startSchedulerNew } = require('./scheduler/cronNew');
@@ -7,12 +8,17 @@ const { cacheTopSymbols } = require('./utils/cache');
 const { log } = require('./utils/logger');
 const config = require('./config/config');
 const db = require('./db');
+
 db.initTables(); // 初始化所有表结构
 
 // 示例使用日志模块
 db.log.insert('INFO', '策略启动完成');
 // const logs = db.log.list(5);
 // console.log('最近日志：', logs);
+console.log('Binance Config:', {
+  apiKey: !!config.binance.apiKey, // 只显示是否存在
+  apiSecret: !!config.binance.apiSecret
+});
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未处理的 Promise 拒绝：', reason);

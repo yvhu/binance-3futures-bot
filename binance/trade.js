@@ -108,16 +108,9 @@ async function setLeverage(symbol, leverage) {
   const timestamp = Date.now();
   const params = new URLSearchParams({
     symbol,
-    // leverage: leverage.toString(),
-    // timestamp: timestamp.toString()
-    leverage: leverage,
-    timestamp: timestamp
+    leverage: leverage.toString(),
+    timestamp: timestamp.toString()
   });
-  // const signature = crypto
-  //   .createHmac('sha256', config.binance.apiSecret)
-  //   .update(params.toString())
-  //   .digest('hex');
-
   const signature = crypto
     .createHmac('sha256', config.binance.apiSecret.trim()) // 同样trim()处理
     .update(params.toString())
@@ -127,7 +120,6 @@ async function setLeverage(symbol, leverage) {
   console.log(config.binance.apiSecret); // 应该显示你的有效API密钥 secret
   console.log('生成的签名:', signature); // 调试输出
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
-  // const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
   const headers = {
     'X-MBX-APIKEY': config.binance.apiKey.trim(), // 添加.trim()去除可能存在的空格
     'Content-Type': 'application/json' // 明确指定内容类型
