@@ -112,7 +112,7 @@ async function setLeverage(symbol, leverage) {
   const params = new URLSearchParams({
     symbol,
     leverage: leverage.toString(),
-    timestamp: localTime.toString()
+    timestamp: timestamp.toString()
   });
   const signature = crypto
     .createHmac('sha256', config.binance.apiSecret.trim()) // 同样trim()处理
