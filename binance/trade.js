@@ -889,13 +889,13 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
       log(`❌ 下单失败详情: ${orderError.message}`);
-      log('orderResult keys:', Object.keys(orderResult || {}));
-      log('orderResult instanceof Error?', orderResult instanceof Error);
-      log('orderResult.status:', orderResult?.status);
-      log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
-      log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
+      // log('orderResult keys:', Object.keys(orderResult || {}));
+      // log('orderResult instanceof Error?', orderResult instanceof Error);
+      // log('orderResult.status:', orderResult?.status);
+      // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
+      // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
 
-      orderResult = null;
+      // orderResult = null;
     }
 
     if (positionAmt) {
@@ -941,7 +941,7 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
     const message = formatTradeNotification(closedTrade);
 
     // 6. 撤单止盈止损订单
-    await cancelOrder(symbol, orderResult.orderId)
+    await cancelOrder(symbol, orderResult.data.orderId)
 
     // 7. 发送通知
     await sendNotification(message);
