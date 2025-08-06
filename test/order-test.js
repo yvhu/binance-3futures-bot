@@ -14,7 +14,7 @@ async function testOrder() {
     try {
         logMessage('=== 开始测试 ===');
 
-        await placeOrderTestNew(null, 'BTCUSDT', 'BUY')
+        await placeOrderTestNew(null, 'KNCUSDT', 'BUY')
 
         logMessage('✅ 消息发送成功');
     } catch (err) {

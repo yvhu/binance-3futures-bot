@@ -888,9 +888,22 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
       log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
     } catch (orderError) {
-      // log(`⚠️ 下单请求失败: ${symbol} ${side}, 原因: ${orderError.message}`);
-      // 继续执行后续逻辑，不抛出错误
-      log(`📥 下单请求返回的报错参数:\n${JSON.stringify(orderResult, null, 2)}`);
+      const errorResponse = {
+        request: {
+          symbol,
+          side,
+          positionAmt,
+          url: finalUrl.split('?')[0] // 脱敏
+        },
+        error: {
+          message: orderError.message,
+          code: orderError.response?.data?.code || 'N/A',
+          detail: orderError.response?.data?.msg || '无详细错误信息',
+          fullError: orderError.response?.data || {} // 完整错误对象
+        }
+      };
+
+      log(`❌ 下单失败详情:\n${JSON.stringify(errorResponse, null, 2)}`);
       orderResult = null;
     }
 
