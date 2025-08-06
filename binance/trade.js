@@ -875,7 +875,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
       .update(data.toString())
       .digest('hex');
 
-    const finalUrl = `${BINANCE_API}/fapi/v1/order/test?${data.toString()}&signature=${signature}`;
+    const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
     const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
 
     // 执行下单操作并捕获可能的错误
