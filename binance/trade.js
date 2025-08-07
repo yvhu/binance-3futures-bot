@@ -899,9 +899,11 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
         if (!orderResult?.data?.orderId) {
           throw new Error("未获取到 orderId，返回数据异常");
         }
-        // 撤单止盈止损订单 (这里处理一下 等待执行完成后撤单)
+        // 撤单止盈止损订单只有在平仓的时候
         log(`📥 下单请求返回的参数ID:${orderResult.data.orderId}`);
-        await cancelOrder(symbol, orderResult.data.orderId)
+        if ((positionAmt && isPosition && orderResult.data.orderId)) {
+          await cancelOrder(symbol, orderResult.data.orderId);
+        }
       }
     } catch (orderError) {
       log(`❌ 下单失败详情: ${orderError.message}`);
