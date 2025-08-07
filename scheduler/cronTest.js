@@ -94,7 +94,7 @@ async function startSchedulerTest() {
                             // await placeOrderTestNew(null, long.symbol, 'BUY');
                             if (serviceStatus.running) {
                                 // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(null, long.symbol, 'BUY');
+                                await placeOrderTestNew(null, long.symbol, 'BUY', false);
                             } else {
                                 await placeOrderTest(null, long.symbol, 'BUY');
                             }
@@ -116,7 +116,7 @@ async function startSchedulerTest() {
                             // await placeOrderTestNew(null, short.symbol, 'SELL');
                             if (serviceStatus.running) {
                                 // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(null, short.symbol, 'SELL');
+                                await placeOrderTestNew(null, short.symbol, 'SELL', false);
                             } else {
                                 await placeOrderTest(null, short.symbol, 'SELL');
                             }

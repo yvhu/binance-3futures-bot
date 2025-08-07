@@ -891,7 +891,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
     // 执行下单操作并捕获可能的错误
     let orderResult;
     try {
-      if (isPosition) {
+      if ((!positionAmt) || (positionAmt && isPosition)) {
         log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
         // log(`finalUrl: ${finalUrl} `);
         orderResult = await proxyPost(finalUrl, null, { headers });
