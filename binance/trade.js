@@ -127,14 +127,14 @@ async function setLeverage(symbol, leverage) {
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey.trim() };
   try {
-    console.log('打印参数url:', url); // 调试输出
-    console.log('打印参数headers:', headers); // 调试输出
+    // console.log('打印参数url:', url); // 调试输出
+    // console.log('打印参数headers:', headers); // 调试输出
     const res = await proxyPost(url, null, { headers });
     log(`✅ 设置杠杆成功 ${symbol}：${leverage}x`);
     return res.data;
-  } catch (err) {
-    log(`❌ 设置杠杆失败 ${symbol}:`, err.response?.data || err.message);
-    throw err;
+  } catch (error) {
+    log(`❌ 设置杠杆失败 ${symbol}:`, error.response?.data || error.message);
+    throw error;
   }
 }
 
@@ -169,8 +169,8 @@ async function cancelAllOpenStopOrders(symbol) {
       log(`🗑 已撤销止损单：${symbol} - ID ${order.orderId}`);
     }
 
-  } catch (err) {
-    log(`❌ 撤销止损单失败 ${symbol}: ${err.message}`);
+  } catch (error) {
+    log(`❌ 撤销止损单失败 ${symbol}: ${error.message}`);
     sendTelegramMessage(`⚠️ 撤销止损单失败 ${symbol}，请手动检查`);
   }
 }
@@ -304,10 +304,10 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
 
     return res.data;
 
-  } catch (err) {
-    log(`❌ 下单失败 ${side} ${symbol}:`, err.response?.data || err.message);
-    sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${err.response?.data?.msg || err.message}`);
-    throw err;
+  } catch (error) {
+    log(`❌ 下单失败 ${side} ${symbol}:`, error.response?.data || error.message);
+    sendTelegramMessage(`❌ 下单失败：${side} ${symbol}，原因: ${error.response?.data?.msg || error.message}`);
+    throw error;
   }
 }
 
@@ -370,9 +370,9 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`✅ 平仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price}`);
       return closedTrade;
 
-    } catch (err) {
-      log(`❌ 平仓失败: ${symbol} ${side}, 原因: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`❌ 平仓失败: ${symbol} ${side}, 原因: ${error.message}`);
+      throw error;
     }
   } else {
     // 开仓逻辑
@@ -387,9 +387,9 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
       log(`✅ 开仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price} 交易ID:${tradeId}`);
       return { tradeId, symbol, price, qtyRaw, side };
 
-    } catch (err) {
-      log(`❌ 开仓失败: ${symbol} ${side}, 原因: ${err.message}`);
-      throw err;
+    } catch (error) {
+      log(`❌ 开仓失败: ${symbol} ${side}, 原因: ${error.message}`);
+      throw error;
     }
   }
 }
@@ -519,9 +519,9 @@ async function closePositionIfNeeded(symbol) {
       log(`🔁 ${symbol} 当前信号与持仓方向相反，准备平仓`);
       sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
     }
-  } catch (err) {
+  } catch (error) {
     // 信号分析失败时记录错误，但不影响平仓判断（可根据需求调整）
-    log(`⚠️ ${symbol} 分析当前信号失败：${err.message}`);
+    log(`⚠️ ${symbol} 分析当前信号失败：${error.message}`);
   }
 
   // 满足持仓时间超限或信号反转任一条件则执行平仓操作
@@ -570,15 +570,15 @@ async function closePositionIfNeeded(symbol) {
         removePosition(symbol);
         log(`✅ ${symbol} 平仓成功`);
         sendTelegramMessage(`✅ ${symbol} 平仓成功`);
-      } catch (err) {
-        log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
-        sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
+      } catch (error) {
+        log(`❌ ${symbol} 平仓失败:`, error.response?.data || error.message);
+        sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${error.response?.data?.msg || error.message}`);
       }
 
-    } catch (err) {
+    } catch (error) {
       // 下单失败，记录错误并通知
-      log(`❌ ${symbol} 平仓失败:`, err.response?.data || err.message);
-      sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${err.response?.data?.msg || err.message}`);
+      log(`❌ ${symbol} 平仓失败:`, error.response?.data || error.message);
+      sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${error.response?.data?.msg || error.message}`);
     }
   } else {
     // 不满足平仓条件，输出当前持仓时间信息
@@ -689,8 +689,8 @@ async function cleanUpOrphanedOrders() {
       try {
         // 4. 处理每个交易对
         await processSymbolOrders(symbol, positions, allOpenOrders);
-      } catch (err) {
-        log(`❌ ${symbol} 订单清理失败: ${err.message}`);
+      } catch (error) {
+        log(`❌ ${symbol} 订单清理失败: ${error.message}`);
       }
     }
   } catch (error) {
@@ -963,9 +963,9 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
 
     log(`✅ 平仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price}`);
     return closedTrade;
-  } catch (err) {
-    log(`❌ 平仓处理失败: ${symbol} ${side}, 原因: ${err.message}`);
-    throw err;
+  } catch (error) {
+    log(`❌ 平仓处理失败: ${symbol} ${side}, 原因: ${error.message}`);
+    throw error;
   }
 }
 
@@ -1018,9 +1018,10 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
 
     log(`✅ 本地开仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price} 交易ID:${newTradeId}`);
     return { tradeId: newTradeId, symbol, price, qtyRaw, side };
-  } catch (err) {
-    log(`❌ 开仓处理失败: ${symbol} ${side}, 原因: ${err.message}`);
-    throw err;
+  } catch (error) {
+    // log(`❌ 开仓处理失败: ${symbol} ${side}, 原因: ${error.message}`);
+    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
+    throw error;
   }
 }
 
@@ -1056,7 +1057,7 @@ async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
     log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
     sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
   } catch (error) {
-    log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${err.message}`);
+    log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
 async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
@@ -1089,8 +1090,8 @@ async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
 
     log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
     sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
-  } catch (err) {
-    log(`⚠️ 设置止损单失败: ${symbol}, 原因: ${err.message}`);
+  } catch (error) {
+    log(`⚠️ 设置止损单失败: ${symbol}, 原因: ${error.message}`);
     // 不抛出错误，继续执行
   }
 }
