@@ -27,8 +27,11 @@ async function startSchedulerTest() {
 
             // ==================== 平仓逻辑 ====================
             try {
+                // 1. 获取所有线上持仓信息
+                const positions = await fetchAllPositions();
+
                 const openTrades = await trade.getOpenTrades(db);
-                log(`✅ 发现 ${openTrades.length} 个未平仓交易`);
+                // log(`✅ 发现 ${openTrades.length} 个本地未平仓交易`);
 
                 for (const openTrade of openTrades) {
                     try {
@@ -36,7 +39,8 @@ async function startSchedulerTest() {
 
                         // 确定平仓方向（与开仓相反）
                         const closeSide = openTrade.side === 'BUY' ? 'SELL' : 'BUY';
-
+                        // 查找匹配的持仓
+                        const matchedPosition = positions.find(p => p.symbol === openTrade.symbol);
                         // await placeOrderTestNew(
                         //     openTrade.id,
                         //     openTrade.symbol,
@@ -50,14 +54,16 @@ async function startSchedulerTest() {
                                 openTrade.id,
                                 openTrade.symbol,
                                 closeSide,
-                                openTrade.quantity.toString()
+                                // 这里数量取线上数量
+                                Math.abs(matchedPosition.positionAmt),
+                                matchedPosition.symbol ? true : false
                             );
                         } else {
                             await placeOrderTest(
                                 openTrade.id,
                                 openTrade.symbol,
                                 closeSide,
-                                openTrade.quantity.toString()
+                                Math.abs(matchedPosition.positionAmt),
                             );
                         }
 
@@ -72,7 +78,7 @@ async function startSchedulerTest() {
                 log(`❌ 获取未平仓交易失败: ${err.message}`);
             }
 
-            log(`✅ 平仓任务完成`);
+            // log(`✅ 平仓任务完成`);
 
             // ==================== 开仓逻辑 ====================
             try {
@@ -81,18 +87,18 @@ async function startSchedulerTest() {
 
                 // 处理做多交易
                 if (topLong.length > 0) {
-                    log(`📈 发现 ${topLong.length} 个做多机会`);
+                    // log(`📈 发现 ${topLong.length} 个做多机会`);
                     for (const long of topLong) {
                         try {
-                            log(`尝试做多: ${long.symbol}`);
+                            // log(`尝试做多: ${long.symbol}`);
                             // await placeOrderTestNew(null, long.symbol, 'BUY');
                             if (serviceStatus.running) {
-                                log(`✅ 进入真实交易`);
+                                // log(`✅ 进入真实交易`);
                                 await placeOrderTestNew(null, long.symbol, 'BUY');
                             } else {
                                 await placeOrderTest(null, long.symbol, 'BUY');
                             }
-                            log(`✅ 做多成功: ${long.symbol}`);
+                            // log(`✅ 做多成功: ${long.symbol}`);
                         } catch (err) {
                             log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
                         }
@@ -103,18 +109,18 @@ async function startSchedulerTest() {
 
                 // 处理做空交易
                 if (topShort.length > 0) {
-                    log(`📉 发现 ${topShort.length} 个做空机会`);
+                    // log(`📉 发现 ${topShort.length} 个做空机会`);
                     for (const short of topShort) {
                         try {
                             log(`尝试做空: ${short.symbol}`);
                             // await placeOrderTestNew(null, short.symbol, 'SELL');
                             if (serviceStatus.running) {
-                                log(`✅ 进入真实交易`);
+                                // log(`✅ 进入真实交易`);
                                 await placeOrderTestNew(null, short.symbol, 'SELL');
                             } else {
                                 await placeOrderTest(null, short.symbol, 'SELL');
                             }
-                            log(`✅ 做空成功: ${short.symbol}`);
+                            // log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
                             log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
                         }
@@ -133,7 +139,7 @@ async function startSchedulerTest() {
     });
 
     // 每小时执行一次（在每分钟的第0分钟执行）
-    cron.schedule('0 * * * *', async () => {
+    cron.schedule('5 * * * *', async () => {
         try {
             log(`⏰ 开始执行每小时盈亏计算任务`);
 

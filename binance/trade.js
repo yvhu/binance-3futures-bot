@@ -786,10 +786,19 @@ async function cancelOrders(symbol, orders) {
 
 // ========== 基础API封装 ==========
 async function fetchAllPositions() {
+  // 1. 创建查询参数（包含当前时间戳，防止请求重放）
   const params = new URLSearchParams({ timestamp: Date.now() });
+
+  // 2. 对参数进行签名（需使用API密钥的SECRET）
   const signature = signParams(params);
+
+  // 3. 构造完整的请求URL（包含签名）
   const url = `${config.binance.baseUrl}/fapi/v2/positionRisk?${params}&signature=${signature}`;
+
+  // 4. 发送GET请求（通过代理工具proxyGet）
   const res = await proxyGet(url);
+
+  // 5. 过滤持仓数量为0的合约，仅返回有效持仓
   return res.data.filter(p => Math.abs(Number(p.positionAmt)) > 0);
 }
 
@@ -837,22 +846,22 @@ function signParams(params) {
 // -----------新完整结构------------
 
 
-async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
+async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isPosition) {
   try {
-    log('✅ 下单流程开始');
+    // log('✅ 下单流程开始');
     const price = await getCurrentPrice(symbol);
-    log('✅ 获取价格');
+    // log('✅ 获取价格');
     const timestamp = await getServerTime();
-    log('✅ 获取系统时间');
+    // log('✅ 获取系统时间');
     const localTime = Date.now();
-    log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
+    // log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
     await setLeverage(symbol, config.leverage);
 
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
     log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
 
     if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
-      log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
+      // log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
       sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 0，可能因为余额不足或不满足最小下单量`);
       return;
     }
@@ -882,11 +891,18 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt) {
     // 执行下单操作并捕获可能的错误
     let orderResult;
     try {
-      log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
-      log(`finalUrl: ${finalUrl} `);
-      orderResult = await proxyPost(finalUrl, null, { headers });
-      // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
-      log(`📥 下单请求返回的参数:\n${JSON.stringify(orderResult, null, 2)}`);
+      if (isPosition) {
+        log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
+        // log(`finalUrl: ${finalUrl} `);
+        orderResult = await proxyPost(finalUrl, null, { headers });
+        // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
+        if (!orderResult?.data?.orderId) {
+          throw new Error("未获取到 orderId，返回数据异常");
+        }
+        // 撤单止盈止损订单 (这里处理一下 等待执行完成后撤单)
+        log(`📥 下单请求返回的参数ID:${orderResult.data.orderId}`);
+        await cancelOrder(symbol, orderResult.data.orderId)
+      }
     } catch (orderError) {
       log(`❌ 下单失败详情: ${orderError.message}`);
       // log('orderResult keys:', Object.keys(orderResult || {}));
@@ -940,10 +956,7 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
     // 5. 准备通知消息（可包含K线信息）
     const message = formatTradeNotification(closedTrade);
 
-    // 6. 撤单止盈止损订单
-    await cancelOrder(symbol, orderResult.data.orderId)
-
-    // 7. 发送通知
+    // 6. 发送通知
     await sendNotification(message);
 
     log(`✅ 平仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price}`);
@@ -1001,7 +1014,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       side: side
     });
 
-    log(`✅ 开仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price} 交易ID:${newTradeId}`);
+    log(`✅ 本地开仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price} 交易ID:${newTradeId}`);
     return { tradeId: newTradeId, symbol, price, qtyRaw, side };
   } catch (err) {
     log(`❌ 开仓处理失败: ${symbol} ${side}, 原因: ${err.message}`);
