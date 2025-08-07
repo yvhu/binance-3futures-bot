@@ -991,10 +991,10 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     if (orderResult) {
       sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     }
-
+    const avgPrice = orderResult?.data?.avgPrice
     // 设置止损单（如果下单成功且启用止损）
     if (enableStopLoss) {
-      await setupStopLossOrder(symbol, side, timestamp, precision);
+      await setupStopLossOrder(symbol, side, timestamp, precision, avgPrice);
     }
     // 设置止盈单（如果下单成功且启用止盈）
     // 获取当前是否在允许的止盈时段
@@ -1005,7 +1005,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
     if (enableTakeProfit && enableTakeProfitByTime) {
-      await setupTakeProfitOrder(symbol, side, timestamp, precision);
+      await setupTakeProfitOrder(symbol, side, timestamp, precision, avgPrice);
     }
 
     // 记录交易（无论下单是否成功）
@@ -1025,8 +1025,8 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
   }
 }
 
-async function setupTakeProfitOrder(symbol, side, timestamp, precision) {
-  const price = await getCurrentPrice(symbol);
+async function setupTakeProfitOrder(symbol, side, timestamp, precision, price) {
+  // const price = await getCurrentPrice(symbol);
   try {
     const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
     const takeProfitPrice = side === 'BUY'
@@ -1062,8 +1062,8 @@ async function setupTakeProfitOrder(symbol, side, timestamp, precision) {
     // log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
-async function setupStopLossOrder(symbol, side, timestamp, precision) {
-  const price = await getCurrentPrice(symbol);
+async function setupStopLossOrder(symbol, side, timestamp, precision, price) {
+  // const price = await getCurrentPrice(symbol);
   try {
     const stopSide = side === 'BUY' ? 'SELL' : 'BUY';
     const stopPrice = side === 'BUY'
