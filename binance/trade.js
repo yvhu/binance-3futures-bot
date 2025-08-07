@@ -120,10 +120,10 @@ async function setLeverage(symbol, leverage) {
     .update(params.toString())
     .digest('hex');
   // 检查你的 config.binance 配置是否正确
-  console.log(`打印杠杆倍数：${config.leverage}`);
-  console.log(`apiKey: ${config.binance.apiKey}`); // 应该显示你的有效API密钥
-  console.log(`apiSecret: ${config.binance.apiSecret}`); // 应该显示你的有效API密钥 secret
-  console.log('生成的签名:', signature); // 调试输出
+  // console.log(`打印杠杆倍数：${config.leverage}`);
+  // console.log(`apiKey: ${config.binance.apiKey}`); // 应该显示你的有效API密钥
+  // console.log(`apiSecret: ${config.binance.apiSecret}`); // 应该显示你的有效API密钥 secret
+  // console.log('生成的签名:', signature); // 调试输出
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey.trim() };
   try {
@@ -994,7 +994,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
 
     // 设置止损单（如果下单成功且启用止损）
     if (enableStopLoss) {
-      await setupStopLossOrder(symbol, side, price, timestamp, precision);
+      await setupStopLossOrder(symbol, side, timestamp, precision);
     }
     // 设置止盈单（如果下单成功且启用止盈）
     // 获取当前是否在允许的止盈时段
@@ -1005,7 +1005,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
     if (enableTakeProfit && enableTakeProfitByTime) {
-      await setupTakeProfitOrder(symbol, side, price, timestamp, precision);
+      await setupTakeProfitOrder(symbol, side, timestamp, precision);
     }
 
     // 记录交易（无论下单是否成功）
@@ -1025,7 +1025,8 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
   }
 }
 
-async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
+async function setupTakeProfitOrder(symbol, side, timestamp, precision) {
+  const price = await getCurrentPrice(symbol);
   try {
     const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
     const takeProfitPrice = side === 'BUY'
@@ -1061,7 +1062,8 @@ async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
     // log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
-async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
+async function setupStopLossOrder(symbol, side, timestamp, precision) {
+  const price = await getCurrentPrice(symbol);
   try {
     const stopSide = side === 'BUY' ? 'SELL' : 'BUY';
     const stopPrice = side === 'BUY'
