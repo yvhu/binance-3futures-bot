@@ -13,7 +13,7 @@ const { getBot } = require('./state');
  */
 function sendTelegramMessage(text) {
   const bot = getBot();
-  log(`🤖 发送 Telegram 消息: bot=${!!bot}, chatId=${config.telegram.chatId}, text="${text}"`);
+  // log(`🤖 发送 Telegram 消息: bot=${!!bot}, chatId=${config.telegram.chatId}, text="${text}"`);
   if (bot && config.telegram.chatId && text) {
     return bot.sendMessage(config.telegram.chatId, text);
   } else {

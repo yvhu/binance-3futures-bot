@@ -69,8 +69,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
   const isConditionMet = avgOscillation > 0.6;  // 直接要求平均振幅>0.6%
   if (!isConditionMet) {
-    log(`❌ ${symbol} 震荡幅度数组: ${oscillations}`);
-    log(`❌ ${symbol} 平均震荡幅度: ${avgOscillation}`);
+    // log(`❌ ${symbol} 震荡幅度数组: ${oscillations}`);
+    // log(`❌ ${symbol} 平均震荡幅度: ${avgOscillation}`);
     log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
   }
@@ -275,11 +275,11 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (!signal) return null;
 
   // 记录详细信息
-  log(`✅ ${symbol}: ${signal} (得分: ${score})`);
-  log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
-  log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
-  log(`  成交量: ${lastVolume.toFixed(2)} (平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
-  log(`  ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%) | 成交量趋势: ${volumeTrendUp ? '↑' : volumeTrendDown ? '↓' : '→'}`);
+  // log(`✅ ${symbol}: ${signal} (得分: ${score})`);
+  // log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
+  // log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
+  // log(`  成交量: ${lastVolume.toFixed(2)} (平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
+  // log(`  ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%) | 成交量趋势: ${volumeTrendUp ? '↑' : volumeTrendDown ? '↓' : '→'}`);
 
   return {
     symbol,
