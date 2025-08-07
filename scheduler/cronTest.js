@@ -48,7 +48,7 @@ async function startSchedulerTest() {
                         //     closeSide,
                         //     openTrade.quantity.toString()
                         // );
-
+                        const positionAmt = matchedPosition.positionAmt ?? openTrade.quantity.toString()
                         if (serviceStatus.running) {
                             log(`✅ 进入真实交易`);
                             await placeOrderTestNew(
@@ -56,7 +56,7 @@ async function startSchedulerTest() {
                                 openTrade.symbol,
                                 closeSide,
                                 // 这里数量取线上数量
-                                Math.abs(matchedPosition.positionAmt),
+                                positionAmt,
                                 matchedPosition.symbol ? true : false
                             );
                         } else {
@@ -64,7 +64,7 @@ async function startSchedulerTest() {
                                 openTrade.id,
                                 openTrade.symbol,
                                 closeSide,
-                                Math.abs(matchedPosition.positionAmt),
+                                positionAmt,
                             );
                         }
 
