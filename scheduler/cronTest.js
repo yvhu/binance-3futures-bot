@@ -29,6 +29,7 @@ async function startSchedulerTest() {
 
             // ==================== 平仓逻辑 ====================
             try {
+                log('\n=== 平仓任务 ===');
                 // 1. 获取所有线上持仓信息
                 const positions = await fetchAllPositions();
                 // log('当前持仓:', JSON.stringify(positions, null, 2));
@@ -85,6 +86,7 @@ async function startSchedulerTest() {
 
             // ==================== 开仓逻辑 ====================
             try {
+                log('\n=== 开仓任务 ===');
                 const topSymbols = getCachedTopSymbols();
                 const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
 
@@ -139,7 +141,7 @@ async function startSchedulerTest() {
             try {
                 // ==================== 1. 止盈止损 ====================
                 const positions = await fetchAllPositions();
-
+                log('\n=== 止盈止损委托 ===');
                 if (positions.length === 0) {
                     log('当前无持仓，跳过持仓处理');
                 } else {
