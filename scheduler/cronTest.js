@@ -181,24 +181,42 @@ async function startSchedulerTest() {
                 if (openOrders.length === 0) {
                     log('当前无未成交委托');
                 } else {
+                    // 获取当前时间
+                    const currentTime = Date.now();
+                    // 设置委托超时阈值（30分钟，单位：毫秒）
+                    const ORDER_TIMEOUT = 30 * 60 * 1000;
+
                     // 如果有持仓，则过滤非持仓委托；若无持仓，取消所有委托
                     const positionSymbols = positions.map(p => p.symbol);
                     const ordersToCancel = positions.length > 0
-                        ? openOrders.filter(order => !positionSymbols.includes(order.symbol))
+                        ? openOrders.filter(order => {
+                            // 条件1：非持仓币种的委托
+                            const isNonPositionOrder = !positionSymbols.includes(order.symbol);
+                            // 条件2：超过设定时间的委托
+                            const orderTime = new Date(order.time).getTime();
+                            const isTimedOut = (currentTime - orderTime) > ORDER_TIMEOUT;
+
+                            return isNonPositionOrder || isTimedOut;
+                        })
                         : openOrders;
 
                     if (ordersToCancel.length > 0) {
-                        log(`需取消 ${ordersToCancel.length} 个非持仓委托`);
+                        log(`需取消 ${ordersToCancel.length} 个委托（非持仓或超时）`);
                         for (const order of ordersToCancel) {
                             try {
+                                const orderTime = new Date(order.time).toLocaleString();
+                                const timeDiff = (currentTime - new Date(order.time).getTime()) / (60 * 1000);
+
+                                log(`⏳ 取消委托: ${order.symbol} (ID: ${order.orderId}) | 委托时间: ${orderTime} | 已存在: ${timeDiff.toFixed(1)}分钟`);
+
                                 await cancelOrder(order.symbol, order.orderId);
-                                log(`✅ 已取消委托: ${order.symbol} (ID: ${order.orderId})`);
+                                log(`✅ 已取消委托: ${order.symbol}`);
                             } catch (error) {
                                 log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
                             }
                         }
                     } else {
-                        log('未找到非持仓委托');
+                        log('未找到需要取消的委托');
                     }
                 }
 
