@@ -1004,7 +1004,9 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       .local() // 使用服务器本地时区
       .format('YYYY年MM月DD日 HH:mm');
     sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
+    log(`✅ 开仓时间段enableTakeProfitByTime : ${enableTakeProfitByTime}`);
     if (enableTakeProfit && enableTakeProfitByTime) {
+      log(`✅ 进来了？`);
       await setupTakeProfitOrder(symbol, side, price, timestamp, precision);
     }
 
