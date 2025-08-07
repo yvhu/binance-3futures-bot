@@ -858,7 +858,7 @@ function signParams(params) {
 
 async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isPosition) {
   try {
-    log('✅ 下单流程开始');
+    log(`✅ 下单流程开始 tradeId: ${tradeId} symbol:${symbol} side:${side} positionAmt:${positionAmt} isPosition:${isPosition}`);
     const price = await getCurrentPrice(symbol);
     // log('✅ 获取价格');
     const timestamp = await getServerTime();
