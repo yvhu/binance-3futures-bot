@@ -796,10 +796,19 @@ async function fetchAllPositions() {
   const url = `${config.binance.baseUrl}/fapi/v2/positionRisk?${params}&signature=${signature}`;
 
   // 4. 发送GET请求（通过代理工具proxyGet）
-  const res = await proxyGet(url);
+  const res = await proxyGet(url, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
 
   // 5. 过滤持仓数量为0的合约，仅返回有效持仓
   return res.data.filter(p => Math.abs(Number(p.positionAmt)) > 0);
+}
+
+// 获取委托信息
+async function fetchOpenOrders() {
+  const params = new URLSearchParams({ timestamp: Date.now() });
+  const signature = signParams(params);
+  const url = `${config.binance.baseUrl}/fapi/v1/openOrders?${params}&signature=${signature}`;
+  const response = await proxyGet(url, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+  return await response.json();
 }
 
 async function fetchAllOpenOrders() {
@@ -1107,5 +1116,8 @@ module.exports = {
   closePositionIfNeeded,
   getAccountTrades,
   getLossIncomes,
-  cleanUpOrphanedOrders
+  cleanUpOrphanedOrders,
+  fetchAllPositions,
+  fetchOpenOrders,
+  cancelOrder
 };

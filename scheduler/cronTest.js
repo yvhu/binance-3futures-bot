@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols, getTopLongShortSymbolsTest } = require('../strategy/selectorRun');
-const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew } = require('../binance/trade');
+const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
@@ -29,6 +29,7 @@ async function startSchedulerTest() {
             try {
                 // 1. 获取所有线上持仓信息
                 const positions = await fetchAllPositions();
+                log('当前持仓:', JSON.stringify(positions, null, 2));
 
                 const openTrades = await trade.getOpenTrades(db);
                 // log(`✅ 发现 ${openTrades.length} 个本地未平仓交易`);
@@ -130,6 +131,32 @@ async function startSchedulerTest() {
                 }
             } catch (err) {
                 log(`❌ 开仓策略执行失败: ${err.message}`);
+            }
+
+            // ==================== 取消非持仓币种的委托 ====================
+            try {
+                log(`✅ 取消非持仓币种的委托`);
+                // 1. 获取当前持仓和委托
+                const positions = await fetchAllPositions();
+                const openOrders = await fetchOpenOrders();
+                log('当前委托:', JSON.stringify(openOrders, null, 2));
+
+                // 2. 提取持仓币种的symbol（如 ["BTCUSDT", "ETHUSDT"]）
+                const positionSymbols = positions.map(p => p.symbol);
+
+                // 3. 过滤出非持仓币种的委托
+                const ordersToCancel = openOrders.filter(
+                    order => !positionSymbols.includes(order.symbol)
+                );
+
+                // 4. 逐个取消委托
+                for (const order of ordersToCancel) {
+                    await cancelOrder(order.symbol, order.orderId);
+                    console.log(`✅ 已取消委托: ${order.symbol} (OrderID: ${order.orderId})`);
+                }
+            } catch (error) {
+                console.error('❌ 取消委托失败:', error.message);
+                throw error;
             }
 
             log(`🎉 ${config.interval}策略循环任务完成`);
