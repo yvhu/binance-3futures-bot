@@ -13,6 +13,7 @@ const config = require('../config/config');
 // const { getOpenTrades } = require('../db/trade')
 const { db, hourlyStats, trade } = require('../db');
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
+const moment = require('moment-timezone');
 
 async function startSchedulerTest() {
     // 3分钟策略主循环
@@ -156,6 +157,7 @@ async function startSchedulerTest() {
                             }
 
                             // 设置止盈单（检查时间段）
+                            const serverTime = new Date();
                             const formattedTime = moment(serverTime)
                                 .local() // 使用服务器本地时区
                                 .format('YYYY年MM月DD日 HH:mm');
