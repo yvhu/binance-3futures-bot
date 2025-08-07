@@ -858,17 +858,17 @@ function signParams(params) {
 
 async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isPosition) {
   try {
-    log(`✅ 下单流程开始 tradeId: ${tradeId} symbol:${symbol} side:${side} positionAmt:${positionAmt} isPosition:${isPosition}`);
+    // log(`✅ 下单流程开始 tradeId: ${tradeId} symbol:${symbol} side:${side} positionAmt:${positionAmt} isPosition:${isPosition}`);
     const price = await getCurrentPrice(symbol);
     // log('✅ 获取价格');
     const timestamp = await getServerTime();
     // log('✅ 获取系统时间');
     const localTime = Date.now();
     // log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
-    log('✅ 设置杠杆symbol：', symbol);
+    // log('✅ 设置杠杆symbol：', symbol);
     await setLeverage(symbol, config.leverage);
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-    log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
+    // log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
 
     if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
       // log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
@@ -902,7 +902,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
     let orderResult;
     try {
       if ((!positionAmt) || (positionAmt && isPosition)) {
-        log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
+        // log(positionAmt ? `📥 平仓下单开始` : `📥 开仓下单开始`);
         // log(`finalUrl: ${finalUrl} `);
         orderResult = await proxyPost(finalUrl, null, { headers });
         // log(`📥 下单请求已发送 ${side} ${symbol}, 数量: ${qty}`);
@@ -928,8 +928,6 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
 
     if (positionAmt) {
       // 平仓逻辑
-
-      log('平仓逻辑开始symbol： ', symbol);
       return await handleClosePosition(tradeId, symbol, side, qty, price, orderResult);
     } else {
       // 开仓逻辑
@@ -956,7 +954,7 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
     // 2. 获取当前K线数据（3分钟）
     const klineData = await fetchKlines(symbol, config.interval);
     const { openTime, open, high, low, close, volume } = klineData[1];
-    log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
+    // log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
 
     // 3. 执行平仓（带K线数据）
     const success = trade.closeTrade(db, tradeId, price, Number(high), Number(low), openTime);

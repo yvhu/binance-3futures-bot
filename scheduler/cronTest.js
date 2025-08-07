@@ -38,10 +38,10 @@ async function startSchedulerTest() {
 
                 for (const openTrade of openTrades) {
                     try {
-                        log(`🔄 处理未平仓交易 ID: ${openTrade.id}, 币种: ${openTrade.symbol}, 方向: ${openTrade.side}`);
+                        log(`🔄 处理未平仓交易 ID: ${openTrade?.id}, 币种: ${openTrade?.symbol}, 方向: ${openTrade?.side}`);
 
                         // 确定平仓方向（与开仓相反）
-                        const closeSide = openTrade.side === 'BUY' ? 'SELL' : 'BUY';
+                        const closeSide = openTrade?.side === 'BUY' ? 'SELL' : 'BUY';
                         // 查找匹配的持仓
                         const matchedPosition = positions.find(p => p.symbol === openTrade.symbol);
                         // await placeOrderTestNew(
@@ -52,27 +52,27 @@ async function startSchedulerTest() {
                         // );
                         const isPositionSymbol = matchedPosition?.symbol ? true : false
                         if (serviceStatus.running) {
-                            log(`✅ 进入真实交易 tradeId: ${openTrade?.id} symbol:${openTrade?.symbol} side:${closeSide} positionAmt:${openTrade?.quantity.toString()} matchedPosition.symbol:${matchedPosition?.symbol}`);
+                            // log(`✅ 进入真实交易 tradeId: ${openTrade?.id} symbol:${openTrade?.symbol} side:${closeSide} positionAmt:${openTrade?.quantity.toString()} matchedPosition.symbol:${matchedPosition?.symbol}`);
                             await placeOrderTestNew(
-                                openTrade.id,
-                                openTrade.symbol,
+                                openTrade?.id,
+                                openTrade?.symbol,
                                 closeSide,
                                 // 这里数量取线上数量
-                                openTrade.quantity.toString(),
+                                openTrade?.quantity.toString(),
                                 isPositionSymbol
                             );
                         } else {
                             await placeOrderTest(
-                                openTrade.id,
-                                openTrade.symbol,
+                                openTrade?.id,
+                                openTrade?.symbol,
                                 closeSide,
-                                openTrade.quantity.toString(),
+                                openTrade?.quantity.toString(),
                             );
                         }
 
-                        log(`✅ 成功平仓交易 ID: ${openTrade.id}`);
+                        log(`✅ 成功平仓交易 ID: ${openTrade?.id}`);
                     } catch (err) {
-                        log(`❌ 平仓失败 ID: ${openTrade.id}, 错误: ${err.message}`);
+                        log(`❌ 平仓失败 ID: ${openTrade?.id}, 错误: ${err.message}`);
                         // 继续处理下一个交易
                         continue;
                     }
@@ -115,7 +115,7 @@ async function startSchedulerTest() {
                     // log(`📉 发现 ${topShort.length} 个做空机会`);
                     for (const short of topShort) {
                         try {
-                            log(`尝试做空: ${short.symbol}`);
+                            // log(`尝试做空: ${short.symbol}`);
                             // await placeOrderTestNew(null, short.symbol, 'SELL');
                             if (serviceStatus.running) {
                                 // log(`✅ 进入真实交易`);
@@ -148,8 +148,8 @@ async function startSchedulerTest() {
                         const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL'; // 自动判断多空方向
 
                         try {
-                            log(`\n=== 处理持仓 ${symbol} ===`);
-                            log(`方向: ${positionSide} | 数量: ${positionAmt} | 开仓价: ${entryPrice}`);
+                            // log(`\n=== 处理持仓 ${symbol} ===`);
+                            // log(`方向: ${positionSide} | 数量: ${positionAmt} | 开仓价: ${entryPrice}`);
 
                             // 设置止损单
                             if (enableStopLoss) {
@@ -202,7 +202,7 @@ async function startSchedulerTest() {
                         : openOrders;
 
                     if (ordersToCancel.length > 0) {
-                        log(`需取消 ${ordersToCancel.length} 个委托（非持仓或超时）`);
+                        // log(`需取消 ${ordersToCancel.length} 个委托（非持仓或超时）`);
                         for (const order of ordersToCancel) {
                             try {
                                 const orderTime = new Date(order.time).toLocaleString();
@@ -211,7 +211,7 @@ async function startSchedulerTest() {
                                 log(`⏳ 取消委托: ${order.symbol} (ID: ${order.orderId}) | 委托时间: ${orderTime} | 已存在: ${timeDiff.toFixed(1)}分钟`);
 
                                 await cancelOrder(order.symbol, order.orderId);
-                                log(`✅ 已取消委托: ${order.symbol}`);
+                                // log(`✅ 已取消委托: ${order.symbol}`);
                             } catch (error) {
                                 log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
                             }
