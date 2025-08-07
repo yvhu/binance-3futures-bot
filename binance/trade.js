@@ -992,6 +992,7 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
       sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     }
     const avgPrice = orderResult?.data?.avgPrice
+    log(`✅ 开仓均价: ${avgPrice}`);
     // 设置止损单（如果下单成功且启用止损）
     if (enableStopLoss) {
       await setupStopLossOrder(symbol, side, timestamp, precision, avgPrice);
