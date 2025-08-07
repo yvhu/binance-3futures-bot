@@ -50,6 +50,7 @@ async function startSchedulerTest() {
                         //     closeSide,
                         //     openTrade.quantity.toString()
                         // );
+                        const isPositionSymbol = matchedPosition?.symbol ? true : false
                         if (serviceStatus.running) {
                             log(`✅ 进入真实交易 tradeId: ${openTrade?.id} symbol:${openTrade?.symbol} side:${closeSide} positionAmt:${openTrade?.quantity.toString()} matchedPosition.symbol:${matchedPosition?.symbol}`);
                             await placeOrderTestNew(
@@ -58,7 +59,7 @@ async function startSchedulerTest() {
                                 closeSide,
                                 // 这里数量取线上数量
                                 openTrade.quantity.toString(),
-                                matchedPosition.symbol ? true : false
+                                isPositionSymbol
                             );
                         } else {
                             await placeOrderTest(
