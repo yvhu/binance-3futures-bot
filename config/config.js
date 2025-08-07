@@ -192,7 +192,7 @@ module.exports = {
     // 用户选择的交易币种缓存路径
     selectedSymbol: './cache/selected-symbol.json',
     // 新增：币种精度缓存路径
-    precision: '../cache/precision.json',
+    precision: './cache/precision.json',
     // 新增：持仓记录缓存
     position: './cache/position.json',
     // 仓位比例设置
