@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols, getTopLongShortSymbolsTest } = require('../strategy/selectorRun');
-const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder } = require('../binance/trade');
+const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder, setupStopLossOrder, setupTakeProfitOrder, isInTradingTimeRange } = require('../binance/trade');
 const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
 const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
@@ -12,6 +12,7 @@ const { cacheTopSymbols } = require('../utils/cache');
 const config = require('../config/config');
 // const { getOpenTrades } = require('../db/trade')
 const { db, hourlyStats, trade } = require('../db');
+const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
 
 async function startSchedulerTest() {
     // 3分钟策略主循环
@@ -132,30 +133,73 @@ async function startSchedulerTest() {
                 log(`❌ 开仓策略执行失败: ${err.message}`);
             }
 
-            // ==================== 取消非持仓币种的委托 ====================
+            // ==================== 处理持仓 ====================
             try {
-                log(`✅ 取消非持仓币种的委托`);
-                // 1. 获取当前持仓和委托
+                // ==================== 1. 止盈止损 ====================
                 const positions = await fetchAllPositions();
-                const openOrders = await fetchOpenOrders();
-                // log('当前委托:', JSON.stringify(openOrders, null, 2));
 
-                // 2. 提取持仓币种的symbol（如 ["BTCUSDT", "ETHUSDT"]）
-                const positionSymbols = positions.map(p => p.symbol);
+                if (positions.length === 0) {
+                    log('当前无持仓，跳过持仓处理');
+                } else {
+                    for (const position of positions) {
+                        const { symbol, positionAmt, entryPrice, positionSide } = position;
+                        const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL'; // 自动判断多空方向
 
-                // 3. 过滤出非持仓币种的委托
-                const ordersToCancel = openOrders.filter(
-                    order => !positionSymbols.includes(order.symbol)
-                );
+                        try {
+                            log(`\n=== 处理持仓 ${symbol} ===`);
+                            log(`方向: ${positionSide} | 数量: ${positionAmt} | 开仓价: ${entryPrice}`);
 
-                // 4. 逐个取消委托
-                for (const order of ordersToCancel) {
-                    await cancelOrder(order.symbol, order.orderId);
-                    console.log(`✅ 已取消委托: ${order.symbol} (OrderID: ${order.orderId})`);
+                            // 设置止损单
+                            if (enableStopLoss) {
+                                await setupStopLossOrder(symbol, side, entryPrice);
+                                log(`✅ ${symbol} 止损单设置完成`);
+                            }
+
+                            // 设置止盈单（检查时间段）
+                            const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
+                            if (enableTakeProfit && enableTakeProfitByTime) {
+                                await setupTakeProfitOrder(symbol, side, entryPrice);
+                                log(`✅ ${symbol} 止盈单设置完成`);
+                            }
+
+                        } catch (error) {
+                            log(`❌ ${symbol} 持仓处理失败: ${error.message}`);
+                            // 继续处理下一个持仓，不中断循环
+                        }
+                    }
                 }
+
+                // ==================== 2. 取消非持仓委托 ====================
+                log('\n=== 检查非持仓委托 ===');
+                const openOrders = await fetchOpenOrders();
+                if (openOrders.length === 0) {
+                    log('当前无未成交委托');
+                } else {
+                    // 如果有持仓，则过滤非持仓委托；若无持仓，取消所有委托
+                    const positionSymbols = positions.map(p => p.symbol);
+                    const ordersToCancel = positions.length > 0
+                        ? openOrders.filter(order => !positionSymbols.includes(order.symbol))
+                        : openOrders;
+
+                    if (ordersToCancel.length > 0) {
+                        log(`需取消 ${ordersToCancel.length} 个非持仓委托`);
+                        for (const order of ordersToCancel) {
+                            try {
+                                await cancelOrder(order.symbol, order.orderId);
+                                log(`✅ 已取消委托: ${order.symbol} (ID: ${order.orderId})`);
+                            } catch (error) {
+                                log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
+                            }
+                        }
+                    } else {
+                        log('未找到非持仓委托');
+                    }
+                }
+
             } catch (error) {
-                console.error('❌ 取消委托失败:', error.message);
-                throw error;
+                // 捕获全局错误（如 fetchAllPositions/fetchOpenOrders 失败）
+                log(`❌ 全局处理失败: ${error.stack}`);
+                throw error; // 根据需求决定是否向上抛出
             }
 
             log(`🎉 ${config.interval}策略循环任务完成`);

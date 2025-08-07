@@ -808,7 +808,7 @@ async function fetchOpenOrders() {
   const signature = signParams(params);
   const url = `${config.binance.baseUrl}/fapi/v1/openOrders?${params}&signature=${signature}`;
   const response = await proxyGet(url, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
-  log('当前委托:', JSON.stringify(response.data, null, 2));
+  // log('当前委托:', JSON.stringify(response.data, null, 2));
   return response.data;
 }
 
@@ -1003,21 +1003,22 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
     if (orderResult) {
       sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
     }
-    // 设置止损单（如果下单成功且启用止损）
-    if (enableStopLoss) {
-      await setupStopLossOrder(symbol, side, timestamp, precision, price);
-    }
-    // 设置止盈单（如果下单成功且启用止盈）
-    // 获取当前是否在允许的止盈时段
-    const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
-    const serverTime = new Date();
-    const formattedTime = moment(serverTime)
-      .local() // 使用服务器本地时区
-      .format('YYYY年MM月DD日 HH:mm');
-    sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
-    if (enableTakeProfit && enableTakeProfitByTime) {
-      await setupTakeProfitOrder(symbol, side, timestamp, precision, price);
-    }
+
+    // // 设置止损单（如果下单成功且启用止损）
+    // if (enableStopLoss) {
+    //   await setupStopLossOrder(symbol, side, timestamp, precision, price);
+    // }
+    // // 设置止盈单（如果下单成功且启用止盈）
+    // // 获取当前是否在允许的止盈时段
+    // const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
+    // const serverTime = new Date();
+    // const formattedTime = moment(serverTime)
+    //   .local() // 使用服务器本地时区
+    //   .format('YYYY年MM月DD日 HH:mm');
+    // sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
+    // if (enableTakeProfit && enableTakeProfitByTime) {
+    //   await setupTakeProfitOrder(symbol, side, timestamp, precision, price);
+    // }
 
     // 记录交易（无论下单是否成功）
     const newTradeId = trade.recordTrade(db, {
@@ -1036,8 +1037,8 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
   }
 }
 
-async function setupTakeProfitOrder(symbol, side, timestamp, precision, price) {
-  // const price = await getCurrentPrice(symbol);
+async function setupTakeProfitOrder(symbol, side, price) {
+  const precision = getSymbolPrecision(symbol);
   try {
     const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
     const takeProfitPrice = side === 'BUY'
@@ -1073,8 +1074,8 @@ async function setupTakeProfitOrder(symbol, side, timestamp, precision, price) {
     // log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
-async function setupStopLossOrder(symbol, side, timestamp, precision, price) {
-  // const price = await getCurrentPrice(symbol);
+async function setupStopLossOrder(symbol, side, price) {
+  const precision = getSymbolPrecision(symbol);
   try {
     const stopSide = side === 'BUY' ? 'SELL' : 'BUY';
     const stopPrice = side === 'BUY'
@@ -1120,5 +1121,8 @@ module.exports = {
   cleanUpOrphanedOrders,
   fetchAllPositions,
   fetchOpenOrders,
-  cancelOrder
+  cancelOrder,
+  setupStopLossOrder,
+  setupTakeProfitOrder,
+  isInTradingTimeRange,
 };
