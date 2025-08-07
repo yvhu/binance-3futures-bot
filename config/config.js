@@ -200,8 +200,8 @@ module.exports = {
   }
 };
 
-console.log('Environment Variables:', {
-  BINANCE_API_KEY: process.env.BINANCE_API_KEY ? '***loaded***' : 'NOT FOUND',
-  BINANCE_SECRET_KEY: process.env.BINANCE_SECRET_KEY ? '***loaded***' : 'NOT FOUND',
-  __dirname: __dirname // 检查当前路径
-});
+// console.log('Environment Variables:', {
+//   BINANCE_API_KEY: process.env.BINANCE_API_KEY ? '***loaded***' : 'NOT FOUND',
+//   BINANCE_SECRET_KEY: process.env.BINANCE_SECRET_KEY ? '***loaded***' : 'NOT FOUND',
+//   __dirname: __dirname // 检查当前路径
+// });

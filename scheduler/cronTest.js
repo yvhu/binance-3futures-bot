@@ -51,7 +51,7 @@ async function startSchedulerTest() {
                         //     openTrade.quantity.toString()
                         // );
                         if (serviceStatus.running) {
-                            log(`✅ 进入真实交易 tradeId: ${openTrade.id} symbol:${openTrade.symbol} side:${closeSide} positionAmt:${openTrade.quantity.toString()} matchedPosition.symbol:${matchedPosition.symbol}`);
+                            log(`✅ 进入真实交易 tradeId: ${openTrade?.id} symbol:${openTrade?.symbol} side:${closeSide} positionAmt:${openTrade?.quantity.toString()} matchedPosition.symbol:${matchedPosition?.symbol}`);
                             await placeOrderTestNew(
                                 openTrade.id,
                                 openTrade.symbol,

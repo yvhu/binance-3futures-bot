@@ -1002,9 +1002,9 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
   // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
   // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
   try {
-    if (orderResult) {
-      sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
-    }
+    // if (orderResult) {
+    //   sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
+    // }
 
     // // 设置止损单（如果下单成功且启用止损）
     // if (enableStopLoss) {

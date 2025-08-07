@@ -14,10 +14,10 @@ db.initTables(); // 初始化所有表结构
 db.log.insert('INFO', '策略启动完成');
 // const logs = db.log.list(5);
 // console.log('最近日志：', logs);
-console.log('Binance Config:', {
-  apiKey: !!config.binance.apiKey, // 只显示是否存在
-  apiSecret: !!config.binance.apiSecret
-});
+// console.log('Binance Config:', {
+//   apiKey: !!config.binance.apiKey, // 只显示是否存在
+//   apiSecret: !!config.binance.apiSecret
+// });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ 未处理的 Promise 拒绝：', reason);
