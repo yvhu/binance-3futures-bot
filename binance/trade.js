@@ -808,6 +808,7 @@ async function fetchOpenOrders() {
   const signature = signParams(params);
   const url = `${config.binance.baseUrl}/fapi/v1/openOrders?${params}&signature=${signature}`;
   const response = await proxyGet(url, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+  log('当前委托:', JSON.stringify(response.data, null, 2));
   return response.data;
 }
 

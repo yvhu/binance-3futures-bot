@@ -139,7 +139,7 @@ async function startSchedulerTest() {
                 // 1. 获取当前持仓和委托
                 const positions = await fetchAllPositions();
                 const openOrders = await fetchOpenOrders();
-                log('当前委托:', JSON.stringify(openOrders, null, 2));
+                // log('当前委托:', JSON.stringify(openOrders, null, 2));
 
                 // 2. 提取持仓币种的symbol（如 ["BTCUSDT", "ETHUSDT"]）
                 const positionSymbols = positions.map(p => p.symbol);
