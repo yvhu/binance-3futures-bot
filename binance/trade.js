@@ -858,15 +858,15 @@ function signParams(params) {
 
 async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isPosition) {
   try {
-    // log('✅ 下单流程开始');
+    log('✅ 下单流程开始');
     const price = await getCurrentPrice(symbol);
     // log('✅ 获取价格');
     const timestamp = await getServerTime();
     // log('✅ 获取系统时间');
     const localTime = Date.now();
     // log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
+    log('✅ 设置杠杆symbol：', symbol);
     await setLeverage(symbol, config.leverage);
-
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
     log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
 
@@ -928,6 +928,8 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
 
     if (positionAmt) {
       // 平仓逻辑
+
+      log('平仓逻辑开始symbol： ', symbol);
       return await handleClosePosition(tradeId, symbol, side, qty, price, orderResult);
     } else {
       // 开仓逻辑

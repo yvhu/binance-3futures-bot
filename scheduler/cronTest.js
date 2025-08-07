@@ -31,7 +31,7 @@ async function startSchedulerTest() {
             try {
                 // 1. 获取所有线上持仓信息
                 const positions = await fetchAllPositions();
-                log('当前持仓:', JSON.stringify(positions, null, 2));
+                // log('当前持仓:', JSON.stringify(positions, null, 2));
 
                 const openTrades = await trade.getOpenTrades(db);
                 // log(`✅ 发现 ${openTrades.length} 个本地未平仓交易`);
