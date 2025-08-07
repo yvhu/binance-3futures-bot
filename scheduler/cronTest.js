@@ -156,7 +156,11 @@ async function startSchedulerTest() {
                             }
 
                             // 设置止盈单（检查时间段）
+                            const formattedTime = moment(serverTime)
+                                .local() // 使用服务器本地时区
+                                .format('YYYY年MM月DD日 HH:mm');
                             const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
+                            sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
                             if (enableTakeProfit && enableTakeProfitByTime) {
                                 await setupTakeProfitOrder(symbol, side, entryPrice);
                                 log(`✅ ${symbol} 止盈单设置完成`);
