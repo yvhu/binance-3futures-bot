@@ -48,7 +48,8 @@ async function startSchedulerTest() {
                         //     closeSide,
                         //     openTrade.quantity.toString()
                         // );
-                        const positionAmt = matchedPosition.positionAmt ?? openTrade.quantity.toString()
+                        const positionAmt = matchedPosition.positionAmt ? matchedPosition.positionAmt : openTrade.quantity.toString()
+                        log(`当前持仓数量:${positionAmt}`);
                         if (serviceStatus.running) {
                             log(`✅ 进入真实交易`);
                             await placeOrderTestNew(

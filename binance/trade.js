@@ -997,6 +997,8 @@ function isInTradingTimeRange(timeRanges) {
 }
 
 async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, timestamp, precision, orderResult) {
+  log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
+  log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
   try {
     if (orderResult) {
       sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
