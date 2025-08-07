@@ -1052,12 +1052,13 @@ async function setupTakeProfitOrder(symbol, side, price, timestamp, precision) {
       .digest('hex');
 
     const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
-    const tpRes = await proxyPost(tpUrl, null, { headers });
+    const tpRes = await proxyPost(tpUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
 
     log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
     sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
   } catch (error) {
-    log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
+    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
+    // log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
 async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
@@ -1091,8 +1092,8 @@ async function setupStopLossOrder(symbol, side, price, timestamp, precision) {
     log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
     sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
   } catch (error) {
-    log(`⚠️ 设置止损单失败: ${symbol}, 原因: ${error.message}`);
-    // 不抛出错误，继续执行
+    // log(`⚠️ 设置止损单失败: ${symbol}, 原因: ${error.message}`);
+    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
   }
 }
 
