@@ -828,8 +828,9 @@ async function cancelOrder(symbol, orderId) {
     timestamp: String(Date.now()),
   });
   const signature = signParams(params);
-  const url = `${config.binance.baseUrl}/fapi/v1/order?${params}&signature=${signature}`;
-  return proxyDelete(url);
+  const url = `${config.binance.baseUrl}/fapi/v1/order?${params.toString()}&signature=${signature}`;
+  const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
+  return proxyDelete(url, { headers });
 }
 
 async function batchCancelOrders(symbol, orderIds) {
