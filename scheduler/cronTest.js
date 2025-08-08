@@ -243,8 +243,8 @@ async function startSchedulerTest() {
                                 await cancelOrder(order.symbol, order.orderId);
 
                             } catch (error) {
-                                log('取消委托失败error:', JSON.stringify(error, null, 2));
-                                // log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
+                                // log('取消委托失败error:', JSON.stringify(error, null, 2));
+                                log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
                             }
                         }
                     } else {
