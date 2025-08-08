@@ -180,40 +180,68 @@ async function startSchedulerTest() {
 
                 // ==================== 2. 取消非持仓委托 ====================
                 log('\n=== 检查非持仓委托 ===');
+                // 获取当前所有未成交委托
                 const openOrders = await fetchOpenOrders();
+
                 if (openOrders.length === 0) {
                     log('当前无未成交委托');
                 } else {
-                    // 获取当前时间
-                    const currentTime = Date.now();
-                    // 设置委托超时阈值（30分钟，单位：毫秒）
-                    const ORDER_TIMEOUT = 30 * 60 * 1000;
+                    /**
+                     * 构建一个 Map 保存持仓币种及其开仓时间
+                     * - key: 币种 symbol
+                     * - value: 持仓的开仓时间戳（毫秒）
+                     * 
+                     * 注意：
+                     *   - 这里假设 positions 中存在 updateTime 或 entryTime 表示开仓时间
+                     *   - 如果没有，请替换成你系统中记录的真实开仓时间字段
+                     */
+                    const positionMap = new Map();
+                    positions.forEach(pos => {
+                        // 优先取 updateTime，没有的话取 entryTime
+                        const openTime = new Date(pos?.updateTime).getTime();
+                        positionMap.set(pos.symbol, openTime);
+                    });
 
-                    // 如果有持仓，则过滤非持仓委托；若无持仓，取消所有委托
-                    const positionSymbols = positions.map(p => p.symbol);
-                    const ordersToCancel = positions.length > 0
-                        ? openOrders.filter(order => {
-                            // 条件1：非持仓币种的委托
-                            const isNonPositionOrder = !positionSymbols.includes(order.symbol);
-                            // 条件2：超过设定时间的委托
-                            const orderTime = new Date(order.time).getTime();
-                            const isTimedOut = (currentTime - orderTime) > ORDER_TIMEOUT;
+                    // 存放两类需要取消的委托
+                    const nonPositionOrders = [];       // 非持仓币种的委托
+                    const invalidPositionOrders = [];   // 持仓币种中已失效的委托
 
-                            return isNonPositionOrder || isTimedOut;
-                        })
-                        : openOrders;
+                    // 遍历所有未成交委托，按条件分类
+                    for (const order of openOrders) {
+                        const orderTime = new Date(order?.time).getTime(); // 委托下单时间
+
+                        if (!positionMap.has(order?.symbol)) {
+                            // 情况 1：该委托对应的币种没有持仓 → 直接加入非持仓列表
+                            nonPositionOrders.push(order);
+                        } else {
+                            // 情况 2：该委托属于持仓币种
+                            const positionOpenTime = positionMap.get(order.symbol);
+
+                            // 如果委托时间早于持仓开仓时间 → 说明是旧的失效委托（可能是上次开仓挂单没撤掉）
+                            if (orderTime < positionOpenTime) {
+                                invalidPositionOrders.push(order);
+                            }
+                        }
+                    }
+
+                    // 合并所有需要取消的委托
+                    const ordersToCancel = [...nonPositionOrders, ...invalidPositionOrders];
 
                     if (ordersToCancel.length > 0) {
-                        // log(`需取消 ${ordersToCancel.length} 个委托（非持仓或超时）`);
+                        // 逐个取消委托
                         for (const order of ordersToCancel) {
                             try {
-                                const orderTime = new Date(order.time).toLocaleString();
-                                const timeDiff = (currentTime - new Date(order.time).getTime()) / (60 * 1000);
+                                // 格式化委托时间
+                                const orderTimeStr = new Date(order.time).toLocaleString();
 
-                                log(`⏳ 取消委托: ${order.symbol} (ID: ${order.orderId}) | 委托时间: ${orderTime} | 已存在: ${timeDiff.toFixed(1)}分钟`);
+                                // 计算委托已存在的分钟数
+                                const timeDiff = (Date.now() - new Date(order.time).getTime()) / (60 * 1000);
 
+                                log(`⏳ 取消委托: ${order.symbol} (ID: ${order.orderId}) | 委托时间: ${orderTimeStr} | 已存在: ${timeDiff.toFixed(1)}分钟`);
+
+                                // 执行取消
                                 await cancelOrder(order.symbol, order.orderId);
-                                // log(`✅ 已取消委托: ${order.symbol}`);
+
                             } catch (error) {
                                 log(`❌ 取消委托 ${order.symbol} 失败: ${error.message}`);
                             }
@@ -222,6 +250,7 @@ async function startSchedulerTest() {
                         log('未找到需要取消的委托');
                     }
                 }
+
 
             } catch (error) {
                 // 捕获全局错误（如 fetchAllPositions/fetchOpenOrders 失败）
@@ -345,29 +374,29 @@ async function startSchedulerTest() {
 
             // 6. 发送通知 - 更新消息内容
             const message = `
-📊 小时盈亏统计 (${hourStart.toLocaleString()} - ${hourEnd.toLocaleString()})
-────────────────
-🔹 总盈亏: ${totalProfit.toFixed(4)} USDT
-🔹 交易次数: ${tradeCount}
+    📊 小时盈亏统计 (${hourStart.toLocaleString()} - ${hourEnd.toLocaleString()})
+    ────────────────
+    🔹 总盈亏: ${totalProfit.toFixed(4)} USDT
+    🔹 交易次数: ${tradeCount}
 
-做多统计:
-✅ 盈利次数: ${longWinCount}次 | 盈利总额: ${longProfit.toFixed(4)} USDT
-❌ 亏损次数: ${longLossCount}次 | 亏损总额: ${Math.abs(longLoss).toFixed(4)} USDT
-📈 净盈亏: ${(longProfit + longLoss).toFixed(4)} USDT
-🎯 胜率: ${stats.long_win_rate.toFixed(2)}%
+    做多统计:
+    ✅ 盈利次数: ${longWinCount}次 | 盈利总额: ${longProfit.toFixed(4)} USDT
+    ❌ 亏损次数: ${longLossCount}次 | 亏损总额: ${Math.abs(longLoss).toFixed(4)} USDT
+    📈 净盈亏: ${(longProfit + longLoss).toFixed(4)} USDT
+    🎯 胜率: ${stats.long_win_rate.toFixed(2)}%
 
-做空统计:
-✅ 盈利次数: ${shortWinCount}次 | 盈利总额: ${shortProfit.toFixed(4)} USDT
-❌ 亏损次数: ${shortLossCount}次 | 亏损总额: ${Math.abs(shortLoss).toFixed(4)} USDT
-📉 净盈亏: ${(shortProfit + shortLoss).toFixed(4)} USDT
-🎯 胜率: ${stats.short_win_rate.toFixed(2)}%
+    做空统计:
+    ✅ 盈利次数: ${shortWinCount}次 | 盈利总额: ${shortProfit.toFixed(4)} USDT
+    ❌ 亏损次数: ${shortLossCount}次 | 亏损总额: ${Math.abs(shortLoss).toFixed(4)} USDT
+    📉 净盈亏: ${(shortProfit + shortLoss).toFixed(4)} USDT
+    🎯 胜率: ${stats.short_win_rate.toFixed(2)}%
 
-平均每笔盈利: ${stats.avg_profit_per_trade.toFixed(4)} USDT
-📊 收益率统计:
-├─ 平均收益率: ${stats.avg_return_rate.toFixed(2)}%
-├─ 最高收益率: ${stats.max_return_rate.toFixed(2)}%
-└─ 最低收益率: ${stats.min_return_rate.toFixed(2)}%
-────────────────`;
+    平均每笔盈利: ${stats.avg_profit_per_trade.toFixed(4)} USDT
+    📊 收益率统计:
+    ├─ 平均收益率: ${stats.avg_return_rate.toFixed(2)}%
+    ├─ 最高收益率: ${stats.max_return_rate.toFixed(2)}%
+    └─ 最低收益率: ${stats.min_return_rate.toFixed(2)}%
+    ────────────────`;
 
             await sendTelegramMessage(message);
             log(`✅ 小时盈亏统计完成`);
