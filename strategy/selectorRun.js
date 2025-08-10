@@ -50,8 +50,7 @@ function isInTradingTimeRange(timeRanges) {
 }
 
 // 评估一个币种的做多或做空信号，并给出强度评分
-async function evaluateSymbolWithScore(symbol, interval = '3m') {
-  // const klines = await fetchKlines(symbol, interval, 100); // 拉取足够的历史K线
+async function evaluateSymbolWithScore(symbol, interval = '15m') {
   const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
   const lastKline = klines[klines.length - 1]; // 获取最后一根K线
 
@@ -62,34 +61,15 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     // 公式:(最高价 - 最低价)/开盘价 * 100
     return (kline.high - kline.low) / kline.open * 100;
   });
-  // 统计震荡幅度大于0.8%的K线数量
-  // const countAboveThreshold = oscillations.filter(osc => osc > 0.7).length;
-  // // 判断数量是否过半(即大于5根)
-  // const isConditionMet = countAboveThreshold > 5;
+  // 统计震荡幅度大于0.6%的K线数量
   const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
-  const isConditionMet = avgOscillation > 0.6;  // 直接要求平均振幅>0.6%
+   // 直接要求平均振幅>0.6%
+  const isConditionMet = avgOscillation > 0.6; 
   if (!isConditionMet) {
-    // log(`❌ ${symbol} 震荡幅度数组: ${oscillations}`);
-    // log(`❌ ${symbol} 平均震荡幅度: ${avgOscillation}`);
     log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
   }
-  // 打印最后一根K线的所有参数
-  // log(`📊 最后一根K线数据 (${symbol} ${interval}):`);
-  // log(`  开盘时间: ${new Date(lastKline.openTime).toISOString()}`);
-  // log(`  开盘价: ${lastKline.open}`);
-  // log(`  最高价: ${lastKline.high}`);
-  // log(`  最低价: ${lastKline.low}`);
-  // log(`  收盘价: ${lastKline.close}`);
-  // log(`  成交量: ${lastKline.volume}`);
-  // log(`  收盘时间: ${new Date(lastKline.closeTime).toISOString()}`);
-  // log(`  成交额: ${lastKline.quoteVolume}`);
-  // log(`  成交笔数: ${lastKline.trades}`);
-  // log(`  主动买入成交量: ${lastKline.takerBuyBaseVolume}`);
-  // log(`  主动买入成交额: ${lastKline.takerBuyQuoteVolume}`);
-
   if (!klines || klines.length < 50) return null;
-
   // 提取价格和成交量数据
   const close = klines.map(k => Number(k.close)).filter(v => !isNaN(v));
   const high = klines.map(k => Number(k.high)).filter(v => !isNaN(v));
@@ -108,12 +88,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
     volume.slice(-volumePeriod).reduce((sum, vol) => sum + Math.pow(vol - avgVolume, 2), 0) / volumePeriod
   );
 
-  // ========== 计算指标 ==========
-  // const ema5 = EMA.calculate({ period: 5, values: close });
-  // const ema13 = EMA.calculate({ period: 13, values: close });
-  // const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
-  // 3m时这些周期覆盖 15m～60m，信号较灵敏。
-  // 15m时这些周期覆盖 1h～5h，可能会滞后。
   const ema5 = config.interval == '15m' ? EMA.calculate({ period: 5, values: close }) : EMA.calculate({ period: 5, values: close });   // 原5 → 3
   const ema13 = config.interval == '15m' ? EMA.calculate({ period: 10, values: close }) : EMA.calculate({ period: 13, values: close });  // 原13 → 8
   const boll = config.interval == '15m' ? BollingerBands.calculate({ period: 14, values: close, stdDev: 2 }) : BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
@@ -194,10 +168,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
 
   // ========== 波动性和成交量过滤 ==========
-  // if (atrPercent < 0.002) {
-  //   log(`🚫 ${symbol} 波动性太小(ATR=${atrPercent.toFixed(4)})`);
-  //   return null;
-  // }
   // 0.2% ATR 对于 3m 是合理的（例如 BTC 每3分钟 20刀）。
   // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
   if (config.interval == '15m' ? (atrPercent < 0.003) : (atrPercent < 0.002)) return null;
@@ -207,16 +177,8 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   //   return null;
   // }
 
-  // ========== 时间过滤 ==========
-  // const now = new Date();
-  // const hours = now.getHours();
-  // const minutes = now.getMinutes();
-
   const enableTakeProfitByTime = isInTradingTimeRange(config.takeSelectRunTimeRanges);
-  // if ((hours >= 1 && hours < 5) || (hours === 12 && minutes >= 30)) {
-  //   log(`🚫 ${symbol} 当前时段流动性不足`);
-  //   return null;
-  // }
+
   if (!enableTakeProfitByTime) {
     const serverTime = new Date();
     const formattedTime = moment(serverTime)
@@ -240,8 +202,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastEma5 < lastEma13) shortScore += 0.5;
   if (lastClose < lastBoll.middle) shortScore += 0.5;
 
-  // 根据ATR百分比动态调整阈值
-  // const atrBasedThreshold = lastATR / lastClose * 1.5;  // 例如：2倍ATR百分比
   // 结合波动率和时间周期
   const baseFactor = 1.5; // 基础倍数
   const volatilityAdjustment = (lastATR / lastClose) * 100; // ATR占比百分比
@@ -253,10 +213,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown) shortScore += 2;
   if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
   if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
-
-  // log(`✅ ${symbol}: (lastClose: ${lastClose} lastVWAP: ${lastVWAP} lastBoll.middle: ${lastBoll.middle} lastBoll.lower: ${lastBoll.lower} volumeTrendDown:${volumeTrendDown})`);
-  // log(`✅ ${symbol}: (lastClose: ${lastClose} lastBoll.upper: ${lastBoll.upper} isVolumeSpike: ${isVolumeSpike} volumeTrendUp: ${volumeTrendUp})`);
-  // log(`✅ ${symbol}: (lastEma5: ${lastEma5} lastEma13: ${lastEma13} atrBasedThreshold: ${atrBasedThreshold} downtrendConfirmed: ${downtrendConfirmed} uptrendConfirmed: ${uptrendConfirmed} )`);
 
   // ========== 最终信号选择 ==========
   // const threshold = 3;
@@ -273,13 +229,6 @@ async function evaluateSymbolWithScore(symbol, interval = '3m') {
   }
 
   if (!signal) return null;
-
-  // 记录详细信息
-  // log(`✅ ${symbol}: ${signal} (得分: ${score})`);
-  // log(`  收盘价: ${lastClose.toFixed(4)} | EMA5: ${lastEma5.toFixed(4)} | EMA13: ${lastEma13.toFixed(4)}`);
-  // log(`  VWAP: ${lastVWAP.toFixed(4)} | 布林带: ${lastBoll.middle.toFixed(4)} [${lastBoll.lower.toFixed(4)}, ${lastBoll.upper.toFixed(4)}]`);
-  // log(`  成交量: ${lastVolume.toFixed(2)} (平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
-  // log(`  ATR: ${lastATR.toFixed(4)} (${(atrPercent * 100).toFixed(2)}%) | 成交量趋势: ${volumeTrendUp ? '↑' : volumeTrendDown ? '↓' : '→'}`);
 
   return {
     symbol,
