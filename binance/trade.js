@@ -980,46 +980,8 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
   }
 }
 
-function isInTradingTimeRange(timeRanges) {
-  const now = new Date();
-  const currentHours = now.getHours();
-  const currentMinutes = now.getMinutes();
-  const currentTime = currentHours * 100 + currentMinutes; // 转换为数字便于比较 如0930
-
-  return timeRanges.some(range => {
-    const [startHour, startMinute] = range.start.split(':').map(Number);
-    const [endHour, endMinute] = range.end.split(':').map(Number);
-
-    const startTime = startHour * 100 + startMinute;
-    const endTime = endHour * 100 + endMinute;
-
-    return currentTime >= startTime && currentTime <= endTime;
-  });
-}
-
 async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, timestamp, precision, orderResult) {
-  // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
-  // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
   try {
-    // if (orderResult) {
-    //   sendTelegramMessage(`✅ 开仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
-    // }
-
-    // // 设置止损单（如果下单成功且启用止损）
-    // if (enableStopLoss) {
-    //   await setupStopLossOrder(symbol, side, timestamp, precision, price);
-    // }
-    // // 设置止盈单（如果下单成功且启用止盈）
-    // // 获取当前是否在允许的止盈时段
-    // const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
-    // const serverTime = new Date();
-    // const formattedTime = moment(serverTime)
-    //   .local() // 使用服务器本地时区
-    //   .format('YYYY年MM月DD日 HH:mm');
-    // sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
-    // if (enableTakeProfit && enableTakeProfitByTime) {
-    //   await setupTakeProfitOrder(symbol, side, timestamp, precision, price);
-    // }
 
     // 记录交易（无论下单是否成功）
     const newTradeId = trade.recordTrade(db, {
@@ -1140,5 +1102,4 @@ module.exports = {
   cancelOrder,
   setupStopLossOrder,
   setupTakeProfitOrder,
-  isInTradingTimeRange,
 };

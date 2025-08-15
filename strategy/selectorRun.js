@@ -10,6 +10,7 @@ const { isFlatMarket, dynamicPriceRangeRatio, calculateADX } = require('../utils
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const { getCurrentPrice } = require('../binance/market');
 const moment = require('moment-timezone');
+const {isInTradingTimeRange } = require('../utils/utils');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -30,23 +31,6 @@ async function fetchKlines(symbol, interval, limit = 50) {
     takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
     ignore: parseFloat(k[11])          // 忽略字段
   }));
-}
-
-function isInTradingTimeRange(timeRanges) {
-  const now = new Date();
-  const currentHours = now.getHours();
-  const currentMinutes = now.getMinutes();
-  const currentTime = currentHours * 100 + currentMinutes; // 转换为数字便于比较 如0930
-
-  return timeRanges.some(range => {
-    const [startHour, startMinute] = range.start.split(':').map(Number);
-    const [endHour, endMinute] = range.end.split(':').map(Number);
-
-    const startTime = startHour * 100 + startMinute;
-    const endTime = endHour * 100 + endMinute;
-
-    return currentTime >= startTime && currentTime <= endTime;
-  });
 }
 
 // 评估一个币种的做多或做空信号，并给出强度评分
