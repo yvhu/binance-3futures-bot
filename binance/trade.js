@@ -1041,40 +1041,48 @@ async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, tim
 async function setupTakeProfitOrder(symbol, side, price) {
   const precision = getSymbolPrecision(symbol);
   try {
-    const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY'; // 止盈方向与开仓方向相反
+    const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY';
     const takeProfitPrice = side === 'BUY'
       ? (price * (1 + takeProfitRate)).toFixed(precision.pricePrecision)
       : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
 
-    // 计算收益率（盈利比例）
     const profitRate = side === 'BUY'
-      ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'  // 做多止盈：盈利比例
-      : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%'; // 做空止盈：盈利比例
+      ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'
+      : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%';
 
-    const tpParams = new URLSearchParams({
-      symbol,
-      side: takeProfitSide,
-      type: 'TAKE_PROFIT_MARKET',
-      stopPrice: takeProfitPrice,   // 虽然叫 stopPrice，其实这里是触发价
-      closePosition: 'true',
-      timestamp: String(Date.now()),
-    });
-
-    const tpSignature = crypto
-      .createHmac('sha256', config.binance.apiSecret)
-      .update(tpParams.toString())
-      .digest('hex');
-
-    const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
-    const tpRes = await proxyPost(tpUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+    // 调用拆分后的API函数
+    await createTakeProfitOrder(symbol, takeProfitSide, takeProfitPrice);
 
     log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
     sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
   } catch (error) {
     log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
-    // log(`⚠️ 设置止盈单失败: ${symbol}, 原因: ${error.message}`);
   }
 }
+
+// 拆分出的API调用函数
+async function createTakeProfitOrder(symbol, side, stopPrice) {
+  const tpParams = new URLSearchParams({
+    symbol,
+    side,
+    type: 'TAKE_PROFIT_MARKET',
+    stopPrice,  // 虽然参数名为stopPrice，实际是触发价
+    closePosition: 'true',
+    timestamp: String(Date.now()),
+  });
+
+  const tpSignature = crypto
+    .createHmac('sha256', config.binance.apiSecret)
+    .update(tpParams.toString())
+    .digest('hex');
+
+  const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
+  const tpRes = await proxyPost(tpUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+  
+  return tpRes;
+}
+
+
 async function setupStopLossOrder(symbol, side, price) {
   const precision = getSymbolPrecision(symbol);
   try {
@@ -1087,29 +1095,36 @@ async function setupStopLossOrder(symbol, side, price) {
       ? ((stopPrice / price - 1) * 100 * 10).toFixed(2) + '%'
       : ((1 - stopPrice / price) * 100 * 10).toFixed(2) + '%';
 
-    const stopParams = new URLSearchParams({
-      symbol,
-      side: stopSide,
-      type: 'STOP_MARKET',
-      stopPrice: stopPrice,
-      closePosition: 'true',
-      timestamp: String(Date.now()),
-    });
-
-    const stopSignature = crypto
-      .createHmac('sha256', config.binance.apiSecret)
-      .update(stopParams.toString())
-      .digest('hex');
-
-    const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
-    const stopRes = await proxyPost(stopUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+    // 调用拆分后的API函数
+    await createStopLossOrder(symbol, stopSide, stopPrice);
 
     log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
     sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
   } catch (error) {
-    // log(`⚠️ 设置止损单失败: ${symbol}, 原因: ${error.message}`);
     log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
   }
+}
+
+// 拆分出的API调用函数
+async function createStopLossOrder(symbol, side, stopPrice) {
+  const stopParams = new URLSearchParams({
+    symbol,
+    side,
+    type: 'STOP_MARKET',
+    stopPrice,
+    closePosition: 'true',
+    timestamp: String(Date.now()),
+  });
+
+  const stopSignature = crypto
+    .createHmac('sha256', config.binance.apiSecret)
+    .update(stopParams.toString())
+    .digest('hex');
+
+  const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
+  const stopRes = await proxyPost(stopUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
+  
+  return stopRes;
 }
 
 module.exports = {
