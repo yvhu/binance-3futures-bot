@@ -137,7 +137,9 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
  * 计算ATR指标
  */
 async function calculateATR(symbol, period) {
-    const klines = await fetchKLines(symbol, '15m', period + 2).slice(0, -1);
+    const klinesRaw = await fetchKLines(symbol, '15m', period + 2);
+    const klines = klinesRaw.slice(0, -1);
+
     let trSum = 0;
 
     for (let i = 1; i <= period; i++) {
@@ -154,7 +156,9 @@ async function calculateATR(symbol, period) {
  * 计算支撑阻力位
  */
 async function calculateSupportResistance(symbol) {
-    const klines = await fetchKLines(symbol, '15m', 51).slice(0, -1);
+    const klinesRaw = await fetchKLines(symbol, '15m', 51);
+    const klines = klinesRaw.slice(0, -1);
+
     const prices = klines.flatMap(k => [
         parseFloat(k.high),
         parseFloat(k.low),
