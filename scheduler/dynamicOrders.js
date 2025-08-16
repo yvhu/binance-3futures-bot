@@ -31,8 +31,8 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
 
             // 1. 动态计算价格
             const { takeProfit, stopLoss } = await calculateDynamicPrices(
-                symbol, 
-                side, 
+                symbol,
+                side,
                 parseFloat(entryPrice)
             );
 
@@ -80,10 +80,14 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
 async function calculateDynamicPrices(symbol, side, entryPrice) {
     // 获取必要数据
     const [klines, atr, supportResistance] = await Promise.all([
-        await fetchKLines(symbol, '15m', 51).slice(0, -1),      // 获取20根15分钟K线
-        calculateATR(symbol, 14),            // 计算ATR(14)
-        calculateSupportResistance(symbol)    // 计算支撑阻力位
+        (async () => {
+            const data = await fetchKLines(symbol, '15m', 51);
+            return data.slice(0, -1);
+        })(),
+        calculateATR(symbol, 14), // 计算ATR(14)
+        calculateSupportResistance(symbol) // 计算支撑阻力位
     ]);
+
 
     // 基础波动范围
     const dynamicRange = atr * 1.5;
@@ -139,7 +143,7 @@ async function calculateATR(symbol, period) {
     for (let i = 1; i <= period; i++) {
         const high = parseFloat(klines[i].high);
         const low = parseFloat(klines[i].low);
-        const prevClose = parseFloat(klines[i-1].close);
+        const prevClose = parseFloat(klines[i - 1].close);
         const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
         trSum += tr;
     }
@@ -172,8 +176,8 @@ function findPriceCluster(prices, type) {
     let maxCount = 0;
 
     for (const price of prices) {
-        const count = prices.filter(p => 
-            type === 'upper' 
+        const count = prices.filter(p =>
+            type === 'upper'
                 ? p >= price && p <= price * (1 + threshold)
                 : p <= price && p >= price * (1 - threshold)
         ).length;
@@ -189,38 +193,25 @@ function findPriceCluster(prices, type) {
 /**
  * 获取K线数据
  */
-// async function fetchKLines(symbol, interval, limit) {
-//     const url = `${config.binance.baseUrl}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-//     const res = await proxyGet(url);
-//     return res.data.map(k => ({
-//         openTime: k[0],
-//         open: k[1],
-//         high: k[2],
-//         low: k[3],
-//         close: k[4],
-//         volume: k[5]
-//     }));
-// }
-
 
 async function fetchKLines(symbol, interval, limit = 50) {
-  const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const response = await proxyGet(url);
+    const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const response = await proxyGet(url);
 
-  return response.data.map(k => ({
-    openTime: k[0],                    // 开盘时间
-    open: parseFloat(k[1]),            // 开盘价
-    high: parseFloat(k[2]),            // 最高价
-    low: parseFloat(k[3]),             // 最低价
-    close: parseFloat(k[4]),           // 收盘价
-    volume: parseFloat(k[5]),          // 成交量
-    closeTime: k[6],                   // 收盘时间
-    quoteVolume: parseFloat(k[7]),     // 成交额
-    trades: k[8],                      // 成交笔数
-    takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
-    takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
-    ignore: parseFloat(k[11])          // 忽略字段
-  }));
+    return response.data.map(k => ({
+        openTime: k[0],                    // 开盘时间
+        open: parseFloat(k[1]),            // 开盘价
+        high: parseFloat(k[2]),            // 最高价
+        low: parseFloat(k[3]),             // 最低价
+        close: parseFloat(k[4]),           // 收盘价
+        volume: parseFloat(k[5]),          // 成交量
+        closeTime: k[6],                   // 收盘时间
+        quoteVolume: parseFloat(k[7]),     // 成交额
+        trades: k[8],                      // 成交笔数
+        takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
+        takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
+        ignore: parseFloat(k[11])          // 忽略字段
+    }));
 }
 
 /**
@@ -236,7 +227,7 @@ function adjustPrecision(symbol, price) {
  */
 function isInTradingTimeRange(timeRanges) {
     if (!timeRanges || timeRanges.length === 0) return true;
-    
+
     const now = moment();
     return timeRanges.some(range => {
         const start = moment(range.start, 'HH:mm');
