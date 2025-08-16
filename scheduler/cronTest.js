@@ -15,6 +15,7 @@ const config = require('../config/config');
 const { db, hourlyStats, trade } = require('../db');
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
 const moment = require('moment-timezone');
+const { setupDynamicOrdersForAllPositions } = require('./dynamicOrders');
 
 async function startSchedulerTest() {
     // 3分钟策略主循环
@@ -146,37 +147,39 @@ async function startSchedulerTest() {
                 if (positions.length === 0) {
                     log('当前无持仓，跳过持仓处理');
                 } else {
-                    for (const position of positions) {
-                        const { symbol, positionAmt, entryPrice, positionSide } = position;
-                        const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL'; // 自动判断多空方向
+                    await setupDynamicOrdersForAllPositions(positions);
+                    // =========== 当前止盈止损关闭 ===============
+                    // for (const position of positions) {
+                    //     const { symbol, positionAmt, entryPrice, positionSide } = position;
+                    //     const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL'; // 自动判断多空方向
 
-                        try {
-                            // log(`\n=== 处理持仓 ${symbol} ===`);
-                            // log(`方向: ${positionSide} | 数量: ${positionAmt} | 开仓价: ${entryPrice}`);
+                    //     try {
+                    //         // log(`\n=== 处理持仓 ${symbol} ===`);
+                    //         // log(`方向: ${positionSide} | 数量: ${positionAmt} | 开仓价: ${entryPrice}`);
 
-                            // 设置止损单
-                            if (enableStopLoss) {
-                                await setupStopLossOrder(symbol, side, entryPrice);
-                                log(`✅ ${symbol} 止损单设置完成`);
-                            }
+                    //         // 设置止损单
+                    //         if (enableStopLoss) {
+                    //             await setupStopLossOrder(symbol, side, entryPrice);
+                    //             log(`✅ ${symbol} 止损单设置完成`);
+                    //         }
 
-                            // 设置止盈单（检查时间段）
-                            const serverTime = new Date();
-                            const formattedTime = moment(serverTime)
-                                .local() // 使用服务器本地时区
-                                .format('YYYY年MM月DD日 HH:mm');
-                            const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
-                            sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
-                            if (enableTakeProfit && enableTakeProfitByTime) {
-                                await setupTakeProfitOrder(symbol, side, entryPrice);
-                                log(`✅ ${symbol} 止盈单设置完成`);
-                            }
+                    //         // 设置止盈单（检查时间段）
+                    //         const serverTime = new Date();
+                    //         const formattedTime = moment(serverTime)
+                    //             .local() // 使用服务器本地时区
+                    //             .format('YYYY年MM月DD日 HH:mm');
+                    //         const enableTakeProfitByTime = isInTradingTimeRange(config.takeProfitTimeRanges);
+                    //         sendTelegramMessage(`✅ 当前时间处于设置 ${enableTakeProfitByTime ? '止盈' : '不止盈'} 时间段: ${formattedTime}`);
+                    //         if (enableTakeProfit && enableTakeProfitByTime) {
+                    //             await setupTakeProfitOrder(symbol, side, entryPrice);
+                    //             log(`✅ ${symbol} 止盈单设置完成`);
+                    //         }
 
-                        } catch (error) {
-                            log(`❌ ${symbol} 持仓处理失败: ${error.message}`);
-                            // 继续处理下一个持仓，不中断循环
-                        }
-                    }
+                    //     } catch (error) {
+                    //         log(`❌ ${symbol} 持仓处理失败: ${error.message}`);
+                    //         // 继续处理下一个持仓，不中断循环
+                    //     }
+                    // }
                 }
 
                 // ==================== 2. 取消非持仓委托 ====================

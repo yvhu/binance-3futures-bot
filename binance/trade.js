@@ -1102,4 +1102,6 @@ module.exports = {
   cancelOrder,
   setupStopLossOrder,
   setupTakeProfitOrder,
+  createTakeProfitOrder,
+  createStopLossOrder,
 };
