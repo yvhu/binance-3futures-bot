@@ -86,11 +86,22 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             sendTelegramMessage(
                 `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
             );
-
         } catch (error) {
-            log(`❌ ${position.symbol} 动态订单设置失败: ${error.message}`);
-            sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${error.message}`);
+            let errorMsg = error.message;
+            if (error.response) {
+                errorMsg += ` | 状态码: ${error.response.status}`;
+                if (error.response.data) {
+                    errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
+                }
+            }
+            log(`❌ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
+            sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
         }
+
+        // } catch (error) {
+        //     log(`❌ ${position.symbol} 动态订单设置失败: ${error.message}`);
+        //     sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${error.message}`);
+        // }
     }
 }
 
