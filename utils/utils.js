@@ -39,13 +39,15 @@ async function fetchKLines(symbol, interval, limit = 50) {
 }
 
 async function calculateATR(symbol, period) {
-  const klines = await fetchKLines(symbol, '15m', period + 1).slice(0, -1);
-  
+  const klinesRaw = await fetchKLines(symbol, '15m', period + 2);
+  const klines = klinesRaw.slice(0, -1);
+
+
   let trSum = 0;
   for (let i = 1; i <= period; i++) {
     const high = parseFloat(klines[i][2]);
     const low = parseFloat(klines[i][3]);
-    const prevClose = parseFloat(klines[i-1][4]);
+    const prevClose = parseFloat(klines[i - 1][4]);
     trSum += Math.max(
       high - low,
       Math.abs(high - prevClose),
@@ -56,13 +58,14 @@ async function calculateATR(symbol, period) {
 }
 
 async function calculateSupportResistance(symbol) {
-  const klines = await fetchKLines(symbol, '15m', 50).slice(0, -1); // 50根K线数据
-  
+  const klinesRaw = await fetchKLines(symbol, '15m', 50);
+  const klines = klinesRaw.slice(0, -1);
+
   const prices = klines.flatMap(k => [
     parseFloat(k[2]), // high
     parseFloat(k[3]), // low
     parseFloat(k[4])  // close
-  ]).sort((a,b) => a - b);
+  ]).sort((a, b) => a - b);
 
   // 识别关键价位（简化版）
   return {
@@ -78,8 +81,8 @@ function findClusterLevel(prices, type) {
   let maxCount = 0;
 
   for (const price of prices) {
-    const count = prices.filter(p => 
-      type === 'upper' 
+    const count = prices.filter(p =>
+      type === 'upper'
         ? p >= price && p <= price * (1 + threshold)
         : p <= price && p >= price * (1 - threshold)
     ).length;
