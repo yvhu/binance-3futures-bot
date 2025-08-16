@@ -916,16 +916,27 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
           await cancelOrder(symbol, orderResult.data.orderId);
         }
       }
-    } catch (orderError) {
-      log(`❌ 下单失败详情: ${orderError.message}`);
-      // log('orderResult keys:', Object.keys(orderResult || {}));
-      // log('orderResult instanceof Error?', orderResult instanceof Error);
-      // log('orderResult.status:', orderResult?.status);
-      // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
-      // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
-
-      // orderResult = null;
+    } catch (error) {
+      let errorMsg = error.message;
+      if (error.response) {
+        errorMsg += ` | 状态码: ${error.response.status}`;
+        if (error.response.data) {
+          errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
+        }
+      }
+      log(`❌ ${position.symbol} 下单失败详情: ${errorMsg}`);
+      sendTelegramMessage(`⚠️ ${position.symbol} 下单失败: ${errorMsg}`);
     }
+    // } catch (orderError) {
+    //   log(`❌ 下单失败详情: ${orderError.message}`);
+    //   // log('orderResult keys:', Object.keys(orderResult || {}));
+    //   // log('orderResult instanceof Error?', orderResult instanceof Error);
+    //   // log('orderResult.status:', orderResult?.status);
+    //   // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
+    //   // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
+
+    //   // orderResult = null;
+    // }
 
     if (positionAmt) {
       // 平仓逻辑
@@ -1040,7 +1051,7 @@ async function createTakeProfitOrder(symbol, side, stopPrice) {
 
   const tpUrl = `${BINANCE_API}/fapi/v1/order?${tpParams.toString()}&signature=${tpSignature}`;
   const tpRes = await proxyPost(tpUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
-  
+
   return tpRes;
 }
 
@@ -1085,7 +1096,7 @@ async function createStopLossOrder(symbol, side, stopPrice) {
 
   const stopUrl = `${BINANCE_API}/fapi/v1/order?${stopParams.toString()}&signature=${stopSignature}`;
   const stopRes = await proxyPost(stopUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
-  
+
   return stopRes;
 }
 
