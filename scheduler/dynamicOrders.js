@@ -15,6 +15,30 @@ const DYNAMIC_TP_RATIO = 1.5;  // 止盈ATR倍数
 const SUPPORT_RESISTANCE_BUFFER = 0.002; // 支撑阻力位缓冲(0.2%)
 
 /**
+ * 获取K线数据
+ */
+
+async function fetchKLines(symbol, interval, limit = 50) {
+    const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const response = await proxyGet(url);
+
+    return response.data.map(k => ({
+        openTime: k[0],                    // 开盘时间
+        open: parseFloat(k[1]),            // 开盘价
+        high: parseFloat(k[2]),            // 最高价
+        low: parseFloat(k[3]),             // 最低价
+        close: parseFloat(k[4]),           // 收盘价
+        volume: parseFloat(k[5]),          // 成交量
+        closeTime: k[6],                   // 收盘时间
+        quoteVolume: parseFloat(k[7]),     // 成交额
+        trades: k[8],                      // 成交笔数
+        takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
+        takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
+        ignore: parseFloat(k[11])          // 忽略字段
+    }));
+}
+
+/**
  * 主函数 - 为所有持仓设置动态止盈止损
  * @param {Array} positions - 当前持仓数组
  */
@@ -192,30 +216,6 @@ function findPriceCluster(prices, type) {
         }
     }
     return bestLevel;
-}
-
-/**
- * 获取K线数据
- */
-
-async function fetchKLines(symbol, interval, limit = 50) {
-    const url = `${config.binance.baseUrl}${config.binance.endpoints.klines}?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    const response = await proxyGet(url);
-
-    return response.data.map(k => ({
-        openTime: k[0],                    // 开盘时间
-        open: parseFloat(k[1]),            // 开盘价
-        high: parseFloat(k[2]),            // 最高价
-        low: parseFloat(k[3]),             // 最低价
-        close: parseFloat(k[4]),           // 收盘价
-        volume: parseFloat(k[5]),          // 成交量
-        closeTime: k[6],                   // 收盘时间
-        quoteVolume: parseFloat(k[7]),     // 成交额
-        trades: k[8],                      // 成交笔数
-        takerBuyBaseVolume: parseFloat(k[9]),  // 主动买入成交量
-        takerBuyQuoteVolume: parseFloat(k[10]), // 主动买入成交额
-        ignore: parseFloat(k[11])          // 忽略字段
-    }));
 }
 
 /**
