@@ -80,7 +80,7 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
 async function calculateDynamicPrices(symbol, side, entryPrice) {
     // 获取必要数据
     const [klines, atr, supportResistance] = await Promise.all([
-        fetchKLines(symbol, '15m', 21).slice(0, -1),      // 获取20根15分钟K线
+        await fetchKLines(symbol, '15m', 51).slice(0, -1),      // 获取20根15分钟K线
         calculateATR(symbol, 14),            // 计算ATR(14)
         calculateSupportResistance(symbol)    // 计算支撑阻力位
     ]);
