@@ -8,6 +8,7 @@ const { log } = require('../utils/logger');
 const { sendTelegramMessage } = require('../telegram/messenger');
 const moment = require('moment-timezone');
 const { createTakeProfitOrder, createStopLossOrder, } = require('../binance/trade')
+const { calculateTrendStrength, simpleMA } = require('../utils/utils')
 
 // 动态止盈止损配置
 const DYNAMIC_SL_RATIO = 0.8; // 止损ATR倍数
@@ -42,68 +43,6 @@ async function fetchKLines(symbol, interval, limit = 50) {
  * 主函数 - 为所有持仓设置动态止盈止损
  * @param {Array} positions - 当前持仓数组
  */
-// async function setupDynamicOrdersForAllPositions(positions = []) {
-//     if (!positions || positions.length === 0) {
-//         log('当前无持仓，跳过止盈止损设置');
-//         return;
-//     }
-
-//     for (const position of positions) {
-//         try {
-//             const { symbol, positionAmt, entryPrice } = position;
-//             const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL';
-
-//             // 1. 动态计算价格
-//             const { takeProfit, stopLoss } = await calculateDynamicPrices(
-//                 symbol,
-//                 side,
-//                 parseFloat(entryPrice)
-//             );
-
-//             // 2. 设置止损单
-//             if (config.riskControl.enableStopLoss) {
-//                 await createStopLossOrder(
-//                     symbol,
-//                     side === 'BUY' ? 'SELL' : 'BUY',
-//                     stopLoss
-//                 );
-//                 log(`🛑 ${symbol} 动态止损设置完成 | 触发价: ${stopLoss}`);
-//             }
-
-//             // 3. 设置止盈单（检查时间段）
-//             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
-//                 await createTakeProfitOrder(
-//                     symbol,
-//                     side === 'BUY' ? 'SELL' : 'BUY',
-//                     takeProfit
-//                 );
-//                 log(`🎯 ${symbol} 动态止盈设置完成 | 触发价: ${takeProfit}`);
-//             }
-
-//             // 发送通知
-//             const priceInfo = `入场价: ${entryPrice} | 止损: ${stopLoss} | 止盈: ${takeProfit}`;
-//             const profitRatio = ((takeProfit - entryPrice) / (entryPrice - stopLoss)).toFixed(2);
-//             sendTelegramMessage(
-//                 `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
-//             );
-//         } catch (error) {
-//             let errorMsg = error.message;
-//             if (error.response) {
-//                 errorMsg += ` | 状态码: ${error.response.status}`;
-//                 if (error.response.data) {
-//                     errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
-//                 }
-//             }
-//             log(`❌ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
-//             sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
-//         }
-
-//         // } catch (error) {
-//         //     log(`❌ ${position.symbol} 动态订单设置失败: ${error.message}`);
-//         //     sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${error.message}`);
-//         // }
-//     }
-// }
 
 async function setupDynamicOrdersForAllPositions(positions = []) {
     if (!positions || positions.length === 0) {
@@ -137,7 +76,7 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     quantity: absPositionAmt,
                     type: 'STOP_LOSS_LIMIT', // 假设使用限价止损单
                 };
-                
+
                 await createStopLossOrder(
                     currentOrderParams.symbol,
                     currentOrderParams.side,
@@ -159,7 +98,7 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     quantity: absPositionAmt,
                     type: 'TAKE_PROFIT_LIMIT', // 假设使用限价止盈单
                 };
-                
+
                 await createTakeProfitOrder(
                     currentOrderParams.symbol,
                     currentOrderParams.side,
@@ -185,13 +124,13 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
                 }
             }
-            
+
             // 打印失败订单的详细信息
             const errorSource = currentOrderType ? `[${currentOrderType}] ` : '';
-            const orderParamsStr = currentOrderParams 
-                ? `\n失败订单参数: ${JSON.stringify(currentOrderParams, null, 2)}` 
+            const orderParamsStr = currentOrderParams
+                ? `\n失败订单参数: ${JSON.stringify(currentOrderParams, null, 2)}`
                 : '';
-            
+
             log(`❌ ${position.symbol} ${errorSource}动态订单设置失败: ${errorMsg}${orderParamsStr}`);
             sendTelegramMessage(
                 `⚠️ ${position.symbol} ${errorSource}动态订单设置失败: ${errorMsg}${orderParamsStr}`
@@ -218,21 +157,44 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
         calculateSupportResistance(symbol) // 计算支撑阻力位
     ]);
 
+    // 常量定义（建议放在配置文件）
+    const TREND_ADJUSTMENT_FACTOR = 0.6; // 下跌趋势调整系数
+    const MIN_PROFIT_RATIO = 0.005;      // 最小盈利比例0.5%
+    const SUPPORT_RESISTANCE_BUFFER = 0.01; // 支撑阻力位缓冲1%
 
     // 基础波动范围
     const dynamicRange = atr * 1.5;
     const lastClose = parseFloat(klines[klines.length - 1].close);
     const isUptrend = lastClose > parseFloat(klines[0].close);
 
-    if (side === 'BUY') {
-        // 做多场景 ======================
-        const dynamicTakeProfit = isUptrend
-            ? Math.min(
-                entryPrice + dynamicRange * DYNAMIC_TP_RATIO,
-                supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER)
-            )
-            : entryPrice + dynamicRange * (DYNAMIC_TP_RATIO * 0.8);
+    // 趋势强度计算（新增）
+    const trendStrength = calculateTrendStrength(klines);
 
+    if (side === 'BUY') {
+        // ============= 做多场景优化版 =============
+        // 动态调整系数（下跌趋势更保守）
+        const dynamicCoefficient = isUptrend
+            ? DYNAMIC_TP_RATIO
+            : DYNAMIC_TP_RATIO * (TREND_ADJUSTMENT_FACTOR + (1 - TREND_ADJUSTMENT_FACTOR) * trendStrength);
+
+        // 基础止盈计算
+        let dynamicTakeProfit = entryPrice + dynamicRange * dynamicCoefficient;
+
+        // 阻力位约束
+        if (supportResistance.resistance) {
+            dynamicTakeProfit = Math.min(
+                dynamicTakeProfit,
+                supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER)
+            );
+        }
+
+        // 下跌趋势额外保护（新增）
+        if (!isUptrend) {
+            const minAcceptableProfit = entryPrice * (1 + MIN_PROFIT_RATIO);
+            dynamicTakeProfit = Math.max(dynamicTakeProfit, minAcceptableProfit);
+        }
+
+        // 止损计算（保持不变）
         const dynamicStopLoss = Math.max(
             entryPrice - dynamicRange * DYNAMIC_SL_RATIO,
             supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER)
@@ -243,7 +205,8 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
             stopLoss: adjustPrecision(symbol, dynamicStopLoss)
         };
     } else {
-        // 做空场景 ======================
+        // ============= 做空场景 =============
+        // （保持您原有的做空逻辑不变）
         const dynamicTakeProfit = isUptrend
             ? Math.max(
                 entryPrice - dynamicRange * DYNAMIC_TP_RATIO,

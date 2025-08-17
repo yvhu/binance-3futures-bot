@@ -95,9 +95,34 @@ function findClusterLevel(prices, type) {
   return bestLevel;
 }
 
+// 新增趋势强度计算函数（0-1范围）
+function calculateTrendStrength(klines) {
+  const closes = klines.map(k => parseFloat(k.close));
+  const smaShort = simpleMA(closes, 5);  // 5周期均线
+  const smaLong = simpleMA(closes, 20);  // 20周期均线
+
+  // 标准化趋势强度（0-1）
+  const rawStrength = (smaShort - smaLong) / (smaLong * 0.05);
+  return Math.min(1, Math.max(0, rawStrength));
+}
+
+// 简单移动平均计算
+function simpleMA(data, period) {
+  if (period <= 0 || data.length < period) return NaN;
+
+  let sum = 0;
+  // 使用经典for循环提升性能
+  for (let i = data.length - period; i < data.length; i++) {
+    sum += data[i];
+  }
+  return sum / period;
+}
+
 module.exports = {
   isInTradingTimeRange,
   calculateATR,
   calculateSupportResistance,
   fetchKLines,
+  calculateTrendStrength,
+  simpleMA,
 };
