@@ -59,10 +59,10 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             const { symbol, positionAmt, entryPrice } = position;
             const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL';
             const absPositionAmt = Math.abs(parseFloat(positionAmt));
-            
+
             // 获取当前市场价格
             const currentPrice = await getCurrentPrice(symbol);
-            
+
             // 1. 动态计算价格
             const { takeProfit, stopLoss } = await calculateDynamicPrices(
                 symbol,
@@ -70,28 +70,30 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 parseFloat(entryPrice)
             );
 
+            let validatedStopLoss = stopLoss;
+            let validatedTakeProfit = takeProfit;
+
             // 2. 设置止损单
             if (config.riskControl.enableStopLoss) {
                 currentOrderType = '止损单';
-                
+
                 // 验证止损价是否合理
-                let validatedStopLoss = stopLoss;
                 if (side === 'BUY') {
                     // 多单止损应低于当前价
                     if (stopLoss >= currentPrice) {
                         // validatedStopLoss = currentPrice * 0.995; // 调整为低于当前价0.5%
                         validatedStopLoss = adjustPrecision(symbol, currentPrice * 0.995),
-                        log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                            log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
                     }
                 } else {
                     // 空单止损应高于当前价
                     if (stopLoss <= currentPrice) {
                         // validatedStopLoss = currentPrice * 1.005; // 调整为高于当前价0.5%
                         validatedStopLoss = adjustPrecision(symbol, currentPrice * 1.005),
-                        log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                            log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
                     }
                 }
-                
+
                 currentOrderParams = {
                     symbol,
                     side: side === 'BUY' ? 'SELL' : 'BUY',
@@ -114,22 +116,21 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             // 3. 设置止盈单
             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
                 currentOrderType = '止盈单';
-                
+
                 // 验证止盈价是否合理
-                let validatedTakeProfit = takeProfit;
                 if (side === 'BUY') {
                     // 多单止盈应高于当前价
                     if (takeProfit <= currentPrice) {
                         // validatedTakeProfit = currentPrice * 1.005; // 调整为高于当前价0.5%
                         validatedTakeProfit = adjustPrecision(symbol, currentPrice * 1.005),
-                        log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                            log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
                 } else {
                     // 空单止盈应低于当前价
                     if (takeProfit >= currentPrice) {
                         // validatedTakeProfit = currentPrice * 0.995; // 调整为低于当前价0.5%
                         validatedTakeProfit = adjustPrecision(symbol, currentPrice * 0.995),
-                        log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                            log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
                 }
 
@@ -154,8 +155,8 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
 
             // 发送通知（使用验证后的价格）
             const priceInfo = `入场价: ${entryPrice} | 止损: ${validatedStopLoss || stopLoss} | 止盈: ${validatedTakeProfit || takeProfit}`;
-            const profitRatio = ((validatedTakeProfit || takeProfit) - entryPrice) / 
-                              (entryPrice - (validatedStopLoss || stopLoss)).toFixed(2);
+            const profitRatio = ((validatedTakeProfit || takeProfit) - entryPrice) /
+                (entryPrice - (validatedStopLoss || stopLoss)).toFixed(2);
             sendTelegramMessage(
                 `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
             );
