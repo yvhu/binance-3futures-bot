@@ -362,10 +362,10 @@ async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
       const closedTrade = trade.getTradeById(db, tradeId);
 
       // 5. 准备通知消息（可包含K线信息）
-      const message = formatTradeNotification(closedTrade);
+      // const message = formatTradeNotification(closedTrade);
 
       // 6. 发送通知
-      await sendNotification(message);
+      // await sendNotification(message);
 
       log(`✅ 平仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price}`);
       return closedTrade;
@@ -986,10 +986,10 @@ async function handleClosePosition(tradeId, symbol, side, qty, price, orderResul
     const closedTrade = trade.getTradeById(db, tradeId);
 
     // 5. 准备通知消息（可包含K线信息）
-    const message = formatTradeNotification(closedTrade);
+    // const message = formatTradeNotification(closedTrade);
 
     // 6. 发送通知
-    await sendNotification(message);
+    // await sendNotification(message);
 
     log(`✅ 平仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price}`);
     return closedTrade;
