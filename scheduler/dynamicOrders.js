@@ -9,6 +9,7 @@ const { sendTelegramMessage } = require('../telegram/messenger');
 const moment = require('moment-timezone');
 const { createTakeProfitOrder, createStopLossOrder, } = require('../binance/trade')
 const { calculateTrendStrength, simpleMA } = require('../utils/utils')
+const { getCurrentPrice } = require('../binance/market')
 
 // 动态止盈止损配置
 const DYNAMIC_SL_RATIO = 0.8; // 止损ATR倍数
@@ -51,14 +52,17 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
     }
 
     for (const position of positions) {
-        let currentOrderType = null; // 标记当前操作类型（止盈/止损）
-        let currentOrderParams = null; // 存储当前订单参数（用于错误打印）
+        let currentOrderType = null;
+        let currentOrderParams = null;
 
         try {
             const { symbol, positionAmt, entryPrice } = position;
             const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL';
-            const absPositionAmt = Math.abs(parseFloat(positionAmt)); // 持仓数量（正数）
-
+            const absPositionAmt = Math.abs(parseFloat(positionAmt));
+            
+            // 获取当前市场价格
+            const currentPrice = await getCurrentPrice(symbol);
+            
             // 1. 动态计算价格
             const { takeProfit, stopLoss } = await calculateDynamicPrices(
                 symbol,
@@ -69,12 +73,29 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             // 2. 设置止损单
             if (config.riskControl.enableStopLoss) {
                 currentOrderType = '止损单';
+                
+                // 验证止损价是否合理
+                let validatedStopLoss = stopLoss;
+                if (side === 'BUY') {
+                    // 多单止损应低于当前价
+                    if (stopLoss >= currentPrice) {
+                        validatedStopLoss = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                    }
+                } else {
+                    // 空单止损应高于当前价
+                    if (stopLoss <= currentPrice) {
+                        validatedStopLoss = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                    }
+                }
+
                 currentOrderParams = {
                     symbol,
-                    side: side === 'BUY' ? 'SELL' : 'BUY', // 平仓方向
-                    stopPrice: stopLoss,
+                    side: side === 'BUY' ? 'SELL' : 'BUY',
+                    stopPrice: validatedStopLoss,
                     quantity: absPositionAmt,
-                    type: 'STOP_LOSS_LIMIT', // 假设使用限价止损单
+                    type: 'STOP_LOSS_LIMIT',
                 };
 
                 await createStopLossOrder(
@@ -83,20 +104,37 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     currentOrderParams.stopPrice,
                     currentOrderParams.quantity
                 );
-                log(`🛑 ${symbol} 动态止损设置完成 | 触发价: ${stopLoss}`);
+                log(`🛑 ${symbol} 动态止损设置完成 | 触发价: ${validatedStopLoss}`);
                 currentOrderType = null;
                 currentOrderParams = null;
             }
 
-            // 3. 设置止盈单（检查时间段）
+            // 3. 设置止盈单
             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
                 currentOrderType = '止盈单';
+                
+                // 验证止盈价是否合理
+                let validatedTakeProfit = takeProfit;
+                if (side === 'BUY') {
+                    // 多单止盈应高于当前价
+                    if (takeProfit <= currentPrice) {
+                        validatedTakeProfit = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                    }
+                } else {
+                    // 空单止盈应低于当前价
+                    if (takeProfit >= currentPrice) {
+                        validatedTakeProfit = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                    }
+                }
+
                 currentOrderParams = {
                     symbol,
-                    side: side === 'BUY' ? 'SELL' : 'BUY', // 平仓方向
-                    stopPrice: takeProfit,
+                    side: side === 'BUY' ? 'SELL' : 'BUY',
+                    stopPrice: validatedTakeProfit,
                     quantity: absPositionAmt,
-                    type: 'TAKE_PROFIT_LIMIT', // 假设使用限价止盈单
+                    type: 'TAKE_PROFIT_LIMIT',
                 };
 
                 await createTakeProfitOrder(
@@ -105,14 +143,15 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     currentOrderParams.stopPrice,
                     currentOrderParams.quantity
                 );
-                log(`🎯 ${symbol} 动态止盈设置完成 | 触发价: ${takeProfit}`);
+                log(`🎯 ${symbol} 动态止盈设置完成 | 触发价: ${validatedTakeProfit}`);
                 currentOrderType = null;
                 currentOrderParams = null;
             }
 
-            // 发送通知
-            const priceInfo = `入场价: ${entryPrice} | 止损: ${stopLoss} | 止盈: ${takeProfit}`;
-            const profitRatio = ((takeProfit - entryPrice) / (entryPrice - stopLoss)).toFixed(2);
+            // 发送通知（使用验证后的价格）
+            const priceInfo = `入场价: ${entryPrice} | 止损: ${validatedStopLoss || stopLoss} | 止盈: ${validatedTakeProfit || takeProfit}`;
+            const profitRatio = ((validatedTakeProfit || takeProfit) - entryPrice) / 
+                              (entryPrice - (validatedStopLoss || stopLoss)).toFixed(2);
             sendTelegramMessage(
                 `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
             );
@@ -125,7 +164,6 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 }
             }
 
-            // 打印失败订单的详细信息
             const errorSource = currentOrderType ? `[${currentOrderType}] ` : '';
             const orderParamsStr = currentOrderParams
                 ? `\n失败订单参数: ${JSON.stringify(currentOrderParams, null, 2)}`

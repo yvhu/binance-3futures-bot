@@ -2,6 +2,7 @@
 
 const config = require('../config/config');
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
+const { getSymbolPrecision } = require('../utils/cache');
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 // ✅ 获取24小时成交量（已集成 cache.js 中，不重复）
 async function getTopSymbols() {
@@ -65,15 +66,79 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
  * @param {string} symbol 交易对，如 BTCUSDT
  * @returns {number} 当前最新成交价
  */
+// async function getCurrentPrice(symbol) {
+//   try {
+//     const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
+//     const res = await proxyGet(url);
+//     return parseFloat(res.data.price);
+//   } catch (error) {
+//     console.error(`Failed to fetch klines for ${symbol}:`, error);
+//     // throw new Error(`Failed to get price data: ${error.message}`);
+//   }
+// }
+
 async function getCurrentPrice(symbol) {
-  try {
-    const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
-    const res = await proxyGet(url);
-    return parseFloat(res.data.price);
-  } catch (error) {
-    console.error(`Failed to fetch klines for ${symbol}:`, error);
-    // throw new Error(`Failed to get price data: ${error.message}`);
-  }
+    try {
+        // 1. 创建查询参数（包含时间戳防止重放）
+        const params = new URLSearchParams({
+            symbol: symbol.toUpperCase(),
+            timestamp: Date.now()
+        });
+
+        // 2. 对参数进行签名
+        const signature = signParams(params);
+        params.append('signature', signature);
+
+        // 3. 构造请求URL（使用Binance最新价格接口）
+        const url = `${config.binance.baseUrl}/fapi/v1/ticker/price?${params}`;
+
+        // 4. 发送认证请求
+        const res = await proxyGet(url, {
+            headers: { 
+                'X-MBX-APIKEY': config.binance.apiKey,
+                'Content-Type': 'application/json'
+            },
+            timeout: 5000 // 5秒超时
+        });
+
+        // 5. 验证响应数据
+        if (!res.data || typeof res.data.price !== 'string') {
+            throw new Error('Invalid price response format');
+        }
+
+        // 6. 返回解析后的价格（带精度校验）
+        return adjustPrecision(symbol, parseFloat(res.data.price));
+        
+    } catch (error) {
+        // 7. 错误处理（带重试机制）
+        log(`❌ 获取 ${symbol} 价格失败: ${error.message}`);
+        
+        // 首次失败后重试一次
+        try {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const fallbackRes = await proxyGet(
+                `${config.binance.baseUrl}/fapi/v1/premiumIndex?symbol=${symbol}`
+            );
+            return adjustPrecision(symbol, parseFloat(fallbackRes.data.markPrice));
+        } catch (retryError) {
+            throw new Error(`获取 ${symbol} 价格最终失败: ${retryError.message}`);
+        }
+    }
+}
+
+// 辅助函数：参数签名（与fetchAllPositions共用）
+function signParams(params) {
+    const query = params.toString();
+    return crypto
+        .createHmac('sha256', config.binance.apiSecret)
+        .update(query)
+        .digest('hex');
+}
+
+// 辅助函数：价格精度调整
+function adjustPrecision(symbol, price) {
+    const precision = getSymbolPrecision(symbol);
+    return parseFloat(price.toFixed(precision.pricePrecision));
 }
 
 module.exports = {
