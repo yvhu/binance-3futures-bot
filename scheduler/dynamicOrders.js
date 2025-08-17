@@ -42,6 +42,69 @@ async function fetchKLines(symbol, interval, limit = 50) {
  * 主函数 - 为所有持仓设置动态止盈止损
  * @param {Array} positions - 当前持仓数组
  */
+// async function setupDynamicOrdersForAllPositions(positions = []) {
+//     if (!positions || positions.length === 0) {
+//         log('当前无持仓，跳过止盈止损设置');
+//         return;
+//     }
+
+//     for (const position of positions) {
+//         try {
+//             const { symbol, positionAmt, entryPrice } = position;
+//             const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL';
+
+//             // 1. 动态计算价格
+//             const { takeProfit, stopLoss } = await calculateDynamicPrices(
+//                 symbol,
+//                 side,
+//                 parseFloat(entryPrice)
+//             );
+
+//             // 2. 设置止损单
+//             if (config.riskControl.enableStopLoss) {
+//                 await createStopLossOrder(
+//                     symbol,
+//                     side === 'BUY' ? 'SELL' : 'BUY',
+//                     stopLoss
+//                 );
+//                 log(`🛑 ${symbol} 动态止损设置完成 | 触发价: ${stopLoss}`);
+//             }
+
+//             // 3. 设置止盈单（检查时间段）
+//             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
+//                 await createTakeProfitOrder(
+//                     symbol,
+//                     side === 'BUY' ? 'SELL' : 'BUY',
+//                     takeProfit
+//                 );
+//                 log(`🎯 ${symbol} 动态止盈设置完成 | 触发价: ${takeProfit}`);
+//             }
+
+//             // 发送通知
+//             const priceInfo = `入场价: ${entryPrice} | 止损: ${stopLoss} | 止盈: ${takeProfit}`;
+//             const profitRatio = ((takeProfit - entryPrice) / (entryPrice - stopLoss)).toFixed(2);
+//             sendTelegramMessage(
+//                 `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
+//             );
+//         } catch (error) {
+//             let errorMsg = error.message;
+//             if (error.response) {
+//                 errorMsg += ` | 状态码: ${error.response.status}`;
+//                 if (error.response.data) {
+//                     errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
+//                 }
+//             }
+//             log(`❌ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
+//             sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
+//         }
+
+//         // } catch (error) {
+//         //     log(`❌ ${position.symbol} 动态订单设置失败: ${error.message}`);
+//         //     sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${error.message}`);
+//         // }
+//     }
+// }
+
 async function setupDynamicOrdersForAllPositions(positions = []) {
     if (!positions || positions.length === 0) {
         log('当前无持仓，跳过止盈止损设置');
@@ -49,9 +112,13 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
     }
 
     for (const position of positions) {
+        let currentOrderType = null; // 标记当前操作类型（止盈/止损）
+        let currentOrderParams = null; // 存储当前订单参数（用于错误打印）
+
         try {
             const { symbol, positionAmt, entryPrice } = position;
             const side = parseFloat(positionAmt) > 0 ? 'BUY' : 'SELL';
+            const absPositionAmt = Math.abs(parseFloat(positionAmt)); // 持仓数量（正数）
 
             // 1. 动态计算价格
             const { takeProfit, stopLoss } = await calculateDynamicPrices(
@@ -62,22 +129,46 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
 
             // 2. 设置止损单
             if (config.riskControl.enableStopLoss) {
-                await createStopLossOrder(
+                currentOrderType = '止损单';
+                currentOrderParams = {
                     symbol,
-                    side === 'BUY' ? 'SELL' : 'BUY',
-                    stopLoss
+                    side: side === 'BUY' ? 'SELL' : 'BUY', // 平仓方向
+                    stopPrice: stopLoss,
+                    quantity: absPositionAmt,
+                    type: 'STOP_LOSS_LIMIT', // 假设使用限价止损单
+                };
+                
+                await createStopLossOrder(
+                    currentOrderParams.symbol,
+                    currentOrderParams.side,
+                    currentOrderParams.stopPrice,
+                    currentOrderParams.quantity
                 );
                 log(`🛑 ${symbol} 动态止损设置完成 | 触发价: ${stopLoss}`);
+                currentOrderType = null;
+                currentOrderParams = null;
             }
 
             // 3. 设置止盈单（检查时间段）
             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
-                await createTakeProfitOrder(
+                currentOrderType = '止盈单';
+                currentOrderParams = {
                     symbol,
-                    side === 'BUY' ? 'SELL' : 'BUY',
-                    takeProfit
+                    side: side === 'BUY' ? 'SELL' : 'BUY', // 平仓方向
+                    stopPrice: takeProfit,
+                    quantity: absPositionAmt,
+                    type: 'TAKE_PROFIT_LIMIT', // 假设使用限价止盈单
+                };
+                
+                await createTakeProfitOrder(
+                    currentOrderParams.symbol,
+                    currentOrderParams.side,
+                    currentOrderParams.stopPrice,
+                    currentOrderParams.quantity
                 );
                 log(`🎯 ${symbol} 动态止盈设置完成 | 触发价: ${takeProfit}`);
+                currentOrderType = null;
+                currentOrderParams = null;
             }
 
             // 发送通知
@@ -94,14 +185,18 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                     errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
                 }
             }
-            log(`❌ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
-            sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${errorMsg}`);
+            
+            // 打印失败订单的详细信息
+            const errorSource = currentOrderType ? `[${currentOrderType}] ` : '';
+            const orderParamsStr = currentOrderParams 
+                ? `\n失败订单参数: ${JSON.stringify(currentOrderParams, null, 2)}` 
+                : '';
+            
+            log(`❌ ${position.symbol} ${errorSource}动态订单设置失败: ${errorMsg}${orderParamsStr}`);
+            sendTelegramMessage(
+                `⚠️ ${position.symbol} ${errorSource}动态订单设置失败: ${errorMsg}${orderParamsStr}`
+            );
         }
-
-        // } catch (error) {
-        //     log(`❌ ${position.symbol} 动态订单设置失败: ${error.message}`);
-        //     sendTelegramMessage(`⚠️ ${position.symbol} 动态订单设置失败: ${error.message}`);
-        // }
     }
 }
 

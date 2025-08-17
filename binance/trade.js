@@ -924,8 +924,8 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
           errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
         }
       }
-      log(`❌ ${position.symbol} 下单失败详情: ${errorMsg}`);
-      sendTelegramMessage(`⚠️ ${position.symbol} 下单失败: ${errorMsg}`);
+      log(`❌ ${symbol} 下单失败详情: ${errorMsg}`);
+      sendTelegramMessage(`⚠️ ${symbol} 下单失败: ${errorMsg}`);
     }
     // } catch (orderError) {
     //   log(`❌ 下单失败详情: ${orderError.message}`);
