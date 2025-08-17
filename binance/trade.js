@@ -932,6 +932,12 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
           return; // 非致命错误，直接返回
         }
 
+        if (error.response.data?.code === -2019) {
+          errorMsg = `您的账户保证金不足: ${errorMsg}`;
+          log(`ℹ️ ${symbol} ${errorMsg}`);
+          return; // 非致命错误，直接返回
+        }
+
         if (error.response.data) {
           errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
         }
