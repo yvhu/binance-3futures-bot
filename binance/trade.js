@@ -191,7 +191,7 @@ async function placeOrder(symbol, side = 'BUY', positionAmt) {
   // 🧩 如果是开仓操作，且数量无效，跳过该币种下单
   if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
     log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
-    sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 0，可能因为余额不足或不满足最小下单量`);
+    sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 ${qtyRaw}，可能因为余额不足或不满足最小下单量`);
     return;
   }
 
@@ -873,7 +873,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
 
     if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
       // log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
-      sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 0，可能因为余额不足或不满足最小下单量`);
+      sendTelegramMessage(`⚠️ 跳过 ${symbol} 下单：数量为 ${qtyRaw}，可能因为余额不足或不满足最小下单量`);
       return;
     }
 
