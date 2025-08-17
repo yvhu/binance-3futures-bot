@@ -917,27 +917,29 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
         }
       }
     } catch (error) {
+      // 4. 增强错误处理（优化后）
       let errorMsg = error.message;
+
+      // 特定错误处理
       if (error.response) {
         errorMsg += ` | 状态码: ${error.response.status}`;
+
+        // 处理订单已完成的情况
+        if (error.response.data?.code === -2011 ||
+          error.response.data?.msg?.includes('UNKNOWN_ORDER')) {
+          errorMsg = `订单已自动完成: ${errorMsg}`;
+          log(`ℹ️ ${symbol} ${errorMsg}`);
+          return; // 非致命错误，直接返回
+        }
+
         if (error.response.data) {
           errorMsg += ` | 返回: ${JSON.stringify(error.response.data)}`;
         }
       }
+
       log(`❌ ${symbol} 下单失败详情: ${errorMsg}`);
       sendTelegramMessage(`⚠️ ${symbol} 下单失败: ${errorMsg}`);
     }
-    // } catch (orderError) {
-    //   log(`❌ 下单失败详情: ${orderError.message}`);
-    //   // log('orderResult keys:', Object.keys(orderResult || {}));
-    //   // log('orderResult instanceof Error?', orderResult instanceof Error);
-    //   // log('orderResult.status:', orderResult?.status);
-    //   // log('orderResult.data:', JSON.stringify(orderResult?.data, null, 2));
-    //   // log('orderResult.response?.data:', JSON.stringify(orderResult?.response?.data, null, 2));
-
-    //   // orderResult = null;
-    // }
-
     if (positionAmt) {
       // 平仓逻辑
       return await handleClosePosition(tradeId, symbol, side, qty, price, orderResult);
