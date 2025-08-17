@@ -79,17 +79,19 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 if (side === 'BUY') {
                     // 多单止损应低于当前价
                     if (stopLoss >= currentPrice) {
-                        validatedStopLoss = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        // validatedStopLoss = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        validatedStopLoss = adjustPrecision(symbol, currentPrice * 0.995),
                         log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
                     }
                 } else {
                     // 空单止损应高于当前价
                     if (stopLoss <= currentPrice) {
-                        validatedStopLoss = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        // validatedStopLoss = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        validatedStopLoss = adjustPrecision(symbol, currentPrice * 1.005),
                         log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
                     }
                 }
-
+                
                 currentOrderParams = {
                     symbol,
                     side: side === 'BUY' ? 'SELL' : 'BUY',
@@ -118,13 +120,15 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 if (side === 'BUY') {
                     // 多单止盈应高于当前价
                     if (takeProfit <= currentPrice) {
-                        validatedTakeProfit = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        // validatedTakeProfit = currentPrice * 1.005; // 调整为高于当前价0.5%
+                        validatedTakeProfit = adjustPrecision(symbol, currentPrice * 1.005),
                         log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
                 } else {
                     // 空单止盈应低于当前价
                     if (takeProfit >= currentPrice) {
-                        validatedTakeProfit = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        // validatedTakeProfit = currentPrice * 0.995; // 调整为低于当前价0.5%
+                        validatedTakeProfit = adjustPrecision(symbol, currentPrice * 0.995),
                         log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
                 }
