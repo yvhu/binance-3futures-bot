@@ -245,11 +245,11 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
     } else {
         // 做空场景 ======================
         const dynamicTakeProfit = isUptrend
-            ? entryPrice - dynamicRange * (DYNAMIC_TP_RATIO * 0.8)
-            : Math.max(
+            ? Math.max(
                 entryPrice - dynamicRange * DYNAMIC_TP_RATIO,
                 supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER)
-            );
+            )
+            : entryPrice - dynamicRange * (DYNAMIC_TP_RATIO * 0.8);
 
         const dynamicStopLoss = Math.min(
             entryPrice + dynamicRange * DYNAMIC_SL_RATIO,
