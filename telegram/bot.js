@@ -11,9 +11,8 @@ const config = require('../config/config');
 const { log } = require('../utils/logger');
 
 const { clearSelectedSymbol, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
-const { runStrategyCycle } = require('../strategy/runner');
 const { getSelectedSymbol } = require('../utils/cache');
-const { selectBestSymbols } = require('../strategy/selector');
+// const { selectBestSymbols } = require('../strategy/selector');
 const { placeOrder } = require('../binance/trade');
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position');
 
@@ -89,12 +88,12 @@ async function sendMainMenu() {
 
   const buttons = strategyType !== 'ema_boll' ? [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
-    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
+    [{ text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新多空数据', callback_data: 'refresh_signal' }],
     [{ text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }, { text: '🧹 清空已选币种', callback_data: 'clear_selected' }]
   ] : [
     [{ text: '▶ 开启策略', callback_data: 'start' }, { text: '⏸ 暂停策略', callback_data: 'stop' }],
-    [{ text: '🔁 立即执行', callback_data: 'run_now' }, { text: '📊 查看状态', callback_data: 'status' }],
+    [{ text: '📊 查看状态', callback_data: 'status' }],
     [{ text: '📦 刷新持仓信息', callback_data: 'refresh_position' }, { text: '♻️ 刷新 Top50 币种', callback_data: 'refresh_top50' }],
     [{ text: `⚙️ 切换信号模式（当前：${getSignalMode()}）`, callback_data: 'toggle_signal_mode' }, { text: '📊 查询小时统计', callback_data: 'show_stats' }],
     [{ text: '📊 24小时止损统计', callback_data: 'show_daily_stats' }, { text: '📊 24小时止盈止损统计', callback_data: 'show_daily_stats_other' }],
@@ -135,23 +134,23 @@ async function sendMainMenu() {
   });
   buttons.push(...strategyButtons);
 
-  if (strategyType == 'ema_boll') {
-    log(`⚠️ 策略类型是： ${strategyType}, 不填加 币种多空方向按钮`);
-  } else {
-    try {
-      const { longList, shortList } = await selectBestSymbols();
-      if (longList.length > 0) {
-        const longButtons = longList.map(item => [{ text: `做多 ${item.symbol}`, callback_data: `long_${item.symbol}` }]);
-        buttons.push(...longButtons);
-      }
-      if (shortList.length > 0) {
-        const shortButtons = shortList.map(item => [{ text: `做空 ${item.symbol}`, callback_data: `short_${item.symbol}` }]);
-        buttons.push(...shortButtons);
-      }
-    } catch (err) {
-      log('⚠️ 选币失败:', err.message);
-    }
-  }
+  // if (strategyType == 'ema_boll') {
+  //   log(`⚠️ 策略类型是： ${strategyType}, 不填加 币种多空方向按钮`);
+  // } else {
+  //   // try {
+  //   //   const { longList, shortList } = await selectBestSymbols();
+  //   //   if (longList.length > 0) {
+  //   //     const longButtons = longList.map(item => [{ text: `做多 ${item.symbol}`, callback_data: `long_${item.symbol}` }]);
+  //   //     buttons.push(...longButtons);
+  //   //   }
+  //   //   if (shortList.length > 0) {
+  //   //     const shortButtons = shortList.map(item => [{ text: `做空 ${item.symbol}`, callback_data: `short_${item.symbol}` }]);
+  //   //     buttons.push(...shortButtons);
+  //   //   }
+  //   // } catch (err) {
+  //   //   log('⚠️ 选币失败:', err.message);
+  //   // }
+  // }
 
   await bot.sendMessage(config.telegram.chatId, '🎯 策略控制面板', {
     reply_markup: {
@@ -809,9 +808,6 @@ async function handleCommand(data, chatId) {
   } else if (data === 'stop') {
     serviceStatus.running = false;
     sendTelegramMessage('⏸ 策略已暂停');
-  } else if (data === 'run_now') {
-    sendTelegramMessage('🚀 手动执行策略...');
-    await runStrategyCycle();
   } else if (data === 'status') {
     const selectedSymbol = getSelectedSymbol();  // 是字符串，比如 'BTCUSDT'
     const cachedRatio = getCachedPositionRatio();

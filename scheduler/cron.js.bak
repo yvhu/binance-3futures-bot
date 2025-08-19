@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { runStrategyCycle } = require('../strategy/runner');
+const { runStrategyCycle } = require('../strategy/runner.js.bak');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 

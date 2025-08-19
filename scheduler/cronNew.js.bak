@@ -3,9 +3,8 @@ const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbols } = require('../strategy/selectorRun');
 const { placeOrder, getLossIncomes, cleanUpOrphanedOrders } = require('../binance/trade');
-const { checkAndCloseLosingPositions } = require('../strategy/checkPositions')
+const { checkAndCloseLosingPositions } = require('../strategy/checkPositions.js.bak')
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position')
-const { getAccountTrades } = require('../binance/trade'); // 你需自己实现或引入获取交易记录的函数
 const { removeFromTopSymbols, getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
 
