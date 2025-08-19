@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const logFile = path.join(__dirname, 'order-test.log');
-const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTest, placeOrderTestNew } = require('../binance/trade');
+const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTestNew } = require('../binance/trade');
 
 async function testOrder() {
     const logMessage = (msg) => {

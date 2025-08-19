@@ -331,69 +331,6 @@ async function getServerTime() {
   return response.data.serverTime;
 }
 
-async function placeOrderTest(tradeId, symbol, side = 'BUY', positionAmt) {
-  const price = await getCurrentPrice(symbol); // 当前市价
-  // await setLeverage(symbol, config.leverage);
-
-  // 计算下单数量
-  const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-  log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
-  if (positionAmt) {
-    // 平仓逻辑
-    try {
-      // 1. 获取原始交易信息
-      const originalTrade = trade.getTradeById(db, tradeId);
-      if (!originalTrade) {
-        throw new Error(`未找到交易记录: ${tradeId}`);
-      }
-
-      // 2. 获取当前K线数据（3分钟）
-      const klineData = await fetchKlines(symbol, config.interval);
-      const { openTime, open, high, low, close, volume } = klineData[1];
-      log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
-
-      // 3. 执行平仓（带K线数据）
-      const success = trade.closeTrade(db, tradeId, price, Number(high), Number(low), openTime);
-      if (!success) {
-        throw new Error('平仓操作失败');
-      }
-
-      // 4. 获取更新后的交易信息
-      const closedTrade = trade.getTradeById(db, tradeId);
-
-      // 5. 准备通知消息（可包含K线信息）
-      // const message = formatTradeNotification(closedTrade);
-
-      // 6. 发送通知
-      // await sendNotification(message);
-
-      log(`✅ 平仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price}`);
-      return closedTrade;
-
-    } catch (error) {
-      log(`❌ 平仓失败: ${symbol} ${side}, 原因: ${error.message}`);
-      throw error;
-    }
-  } else {
-    // 开仓逻辑
-    try {
-      const tradeId = trade.recordTrade(db, {
-        symbol: symbol,
-        price: price,
-        qtyRaw: qtyRaw,
-        side: side
-      });
-
-      log(`✅ 开仓成功: ${symbol} ${side} 数量:${qtyRaw} 价格:${price} 交易ID:${tradeId}`);
-      return { tradeId, symbol, price, qtyRaw, side };
-
-    } catch (error) {
-      log(`❌ 开仓失败: ${symbol} ${side}, 原因: ${error.message}`);
-      throw error;
-    }
-  }
-}
-
 /**
  * 格式化交易通知消息
  * @param {Object} trade 交易记录
@@ -857,19 +794,17 @@ function signParams(params) {
 // -----------新完整结构------------
 
 
-async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isPosition) {
+async function placeOrderTestNew(symbol, side = 'BUY', positionAmt, isPosition) {
   try {
-    // log(`✅ 下单流程开始 tradeId: ${tradeId} symbol:${symbol} side:${side} positionAmt:${positionAmt} isPosition:${isPosition}`);
     const price = await getCurrentPrice(symbol);
     // log('✅ 获取价格');
-    const timestamp = await getServerTime();
+    // const timestamp = await getServerTime();
     // log('✅ 获取系统时间');
-    const localTime = Date.now();
+    // const localTime = Date.now();
     // log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
     // log('✅ 设置杠杆symbol：', symbol);
     await setLeverage(symbol, config.leverage);
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
-    // log(`✅ symbol: ${symbol} ${side} ID:${tradeId} 开平仓:${positionAmt ? '平仓' : '开仓'}`);
 
     if (!positionAmt && (!qtyRaw || Math.abs(qtyRaw) <= 0)) {
       // log(`⚠️ ${symbol} 无法下单：数量为 0，跳过。可能因为余额不足或数量低于最小值。`);
@@ -911,7 +846,7 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
           throw new Error("未获取到 orderId，返回数据异常");
         }
         // 撤单止盈止损订单只有在平仓的时候
-        log(`📥 下单请求返回的参数ID:${orderResult.data.orderId}`);
+        // log(`📥 下单请求返回的参数ID:${orderResult.data.orderId}`);
         if ((positionAmt && isPosition && orderResult.data.orderId)) {
           await cancelOrder(symbol, orderResult.data.orderId);
         }
@@ -944,77 +879,10 @@ async function placeOrderTestNew(tradeId, symbol, side = 'BUY', positionAmt, isP
       }
 
       log(`❌ ${symbol} 下单失败详情: ${errorMsg}`);
-      sendTelegramMessage(`⚠️ ${symbol} 下单失败: ${errorMsg}`);
-    }
-    if (positionAmt) {
-      // 平仓逻辑
-      return await handleClosePosition(tradeId, symbol, side, qty, price, orderResult);
-    } else {
-      // 开仓逻辑
-      return await handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, localTime, precision, orderResult);
+      // sendTelegramMessage(`⚠️ ${symbol} 下单失败: ${errorMsg}`);
     }
   } catch (error) {
     log(`❌ 下单流程出现异常: ${symbol} ${side}, 原因: ${error.message}`);
-    throw error;
-  }
-}
-
-async function handleClosePosition(tradeId, symbol, side, qty, price, orderResult) {
-  try {
-    if (orderResult) {
-      sendTelegramMessage(`✅ 平仓下单成功：${side} ${symbol} 数量: ${qty}，价格: ${price}`);
-    }
-
-    // 1. 获取原始交易信息
-    const originalTrade = trade.getTradeById(db, tradeId);
-    if (!originalTrade) {
-      throw new Error(`未找到交易记录: ${tradeId}`);
-    }
-
-    // 2. 获取当前K线数据（3分钟）
-    const klineData = await fetchKlines(symbol, config.interval);
-    const { openTime, open, high, low, close, volume } = klineData[1];
-    // log(`✅ 获取平仓K线信息: ${symbol} openTime：${new Date(openTime).toISOString()} open:${open} high:${high} low:${low} close:${close} volume: ${volume}`);
-
-    // 3. 执行平仓（带K线数据）
-    const success = trade.closeTrade(db, tradeId, price, Number(high), Number(low), openTime);
-    if (!success) {
-      throw new Error('平仓操作失败');
-    }
-
-    // 4. 获取更新后的交易信息
-    const closedTrade = trade.getTradeById(db, tradeId);
-
-    // 5. 准备通知消息（可包含K线信息）
-    // const message = formatTradeNotification(closedTrade);
-
-    // 6. 发送通知
-    // await sendNotification(message);
-
-    log(`✅ 平仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price}`);
-    return closedTrade;
-  } catch (error) {
-    log(`❌ 平仓处理失败: ${symbol} ${side}, 原因: ${error.message}`);
-    throw error;
-  }
-}
-
-async function handleOpenPosition(tradeId, symbol, side, qty, qtyRaw, price, timestamp, precision, orderResult) {
-  try {
-
-    // 记录交易（无论下单是否成功）
-    const newTradeId = trade.recordTrade(db, {
-      symbol: symbol,
-      price: price,
-      qtyRaw: qty,
-      side: side
-    });
-
-    log(`✅ 本地开仓处理完成: ${symbol} ${side} 数量:${qty} 价格:${price} 交易ID:${newTradeId}`);
-    return { tradeId: newTradeId, symbol, price, qtyRaw, side };
-  } catch (error) {
-    // log(`❌ 开仓处理失败: ${symbol} ${side}, 原因: ${error.message}`);
-    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
     throw error;
   }
 }
@@ -1110,7 +978,6 @@ async function createStopLossOrder(symbol, side, stopPrice) {
 
 module.exports = {
   placeOrder,
-  placeOrderTest,
   placeOrderTestNew,
   closePositionIfNeeded,
   getAccountTrades,

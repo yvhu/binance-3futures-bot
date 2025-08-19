@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { log } = require('../utils/logger');
 const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbolsTest } = require('../strategy/selectorRun');
-const { placeOrderTest, placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder } = require('../binance/trade');
+const { placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder } = require('../binance/trade');
 
 const { getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
@@ -30,41 +30,35 @@ async function startSchedulerTest() {
                 const positions = await fetchAllPositions();
                 // log('当前持仓:', JSON.stringify(positions, null, 2));
 
-                const openTrades = await trade.getOpenTrades(db);
-                // log(`✅ 发现 ${openTrades.length} 个本地未平仓交易`);
+                // 筛选出有实际持仓的部位（positionAmt不为0）
+                const activePositions = positions.filter(p => {
+                    const positionAmt = parseFloat(p.positionAmt);
+                    return positionAmt !== 0 && Math.abs(positionAmt) > 0;
+                });
 
-                for (const openTrade of openTrades) {
+                log(`✅ 发现 ${activePositions.length} 个币安持仓需要平仓`);
+
+                for (const position of activePositions) {
                     try {
-                        log(`🔄 处理未平仓交易 ID: ${openTrade?.id}, 币种: ${openTrade?.symbol}, 方向: ${openTrade?.side}`);
+                        const symbol = position.symbol;
+                        const positionAmt = parseFloat(position.positionAmt);
+                        const absPositionAmt = Math.abs(positionAmt);
 
-                        // 确定平仓方向（与开仓相反）
-                        const closeSide = openTrade?.side === 'BUY' ? 'SELL' : 'BUY';
-                        // 查找匹配的持仓
-                        const matchedPosition = positions.find(p => p.symbol === openTrade.symbol);
-                        const isPositionSymbol = matchedPosition?.symbol ? true : false
-                        if (serviceStatus.running) {
-                            // log(`✅ 进入真实交易 tradeId: ${openTrade?.id} symbol:${openTrade?.symbol} side:${closeSide} positionAmt:${openTrade?.quantity.toString()} matchedPosition.symbol:${matchedPosition?.symbol}`);
-                            await placeOrderTestNew(
-                                openTrade?.id,
-                                openTrade?.symbol,
-                                closeSide,
-                                // 这里数量取线上数量
-                                openTrade?.quantity.toString(),
-                                isPositionSymbol
-                            );
-                        } else {
-                            await placeOrderTest(
-                                openTrade?.id,
-                                openTrade?.symbol,
-                                closeSide,
-                                openTrade?.quantity.toString(),
-                            );
-                        }
+                        // 确定平仓方向（与持仓数量相反）
+                        const closeSide = positionAmt > 0 ? 'SELL' : 'BUY';
 
-                        log(`✅ 成功平仓交易 ID: ${openTrade?.id}`);
+                        // log(`🔄 处理持仓 币种: ${symbol}, 数量: ${positionAmt}, 平仓方向: ${closeSide}`);
+
+                        await placeOrderTestNew(
+                                symbol,
+                                closeSide,
+                                absPositionAmt.toString(),
+                                true // 确认有持仓
+                            );
+                        log(`✅ 成功平仓 币种: ${symbol}`);
                     } catch (err) {
-                        log(`❌ 平仓失败 ID: ${openTrade?.id}, 错误: ${err.message}`);
-                        // 继续处理下一个交易
+                        log(`❌ 平仓失败 币种: ${position.symbol}, 错误: ${err.message}`);
+                        // 继续处理下一个持仓
                         continue;
                     }
                 }
@@ -88,9 +82,7 @@ async function startSchedulerTest() {
                             // log(`尝试做多: ${long.symbol}`);
                             if (serviceStatus.running) {
                                 // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(null, long.symbol, 'BUY', false);
-                            } else {
-                                await placeOrderTest(null, long.symbol, 'BUY');
+                                await placeOrderTestNew(long.symbol, 'BUY', null, false);
                             }
                             // log(`✅ 做多成功: ${long.symbol}`);
                         } catch (err) {
@@ -109,9 +101,7 @@ async function startSchedulerTest() {
                             // log(`尝试做空: ${short.symbol}`);
                             if (serviceStatus.running) {
                                 // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(null, short.symbol, 'SELL', false);
-                            } else {
-                                await placeOrderTest(null, short.symbol, 'SELL');
+                                await placeOrderTestNew(short.symbol, 'SELL', null, false);
                             }
                             // log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
