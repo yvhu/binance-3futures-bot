@@ -74,17 +74,6 @@ async function getKlines(symbol, interval = '3m', limit = 50) {
  * @param {string} symbol 交易对，如 BTCUSDT
  * @returns {number} 当前最新成交价
  */
-// async function getCurrentPrice(symbol) {
-//   try {
-//     const url = `${BINANCE_API}/fapi/v1/ticker/price?symbol=${symbol}`;
-//     const res = await proxyGet(url);
-//     return parseFloat(res.data.price);
-//   } catch (error) {
-//     console.error(`Failed to fetch klines for ${symbol}:`, error);
-//     // throw new Error(`Failed to get price data: ${error.message}`);
-//   }
-// }
-
 async function getCurrentPrice(symbol) {
   try {
     // 1. 创建查询参数（包含时间戳防止重放）
