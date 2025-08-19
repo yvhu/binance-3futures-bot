@@ -10,8 +10,20 @@ const { cacheTopSymbols } = require('../utils/cache');
 const config = require('../config/config');
 const { db, trade } = require('../db');
 const { setupDynamicOrdersForAllPositions } = require('./dynamicOrders');
+const { checkMarketTrend } = require('./checkMarketTrend')
+const { getTrendText, getTradingSuggestion } = require('../utils/utils');
 
 async function startSchedulerTest() {
+    let marketTrend = {
+        trend: 'neutral',
+        confidence: 0,
+        lastUpdate: null,
+        isOneSided: false
+    };
+    // 做多条件
+    const topLongMap = ['bullish', 'strong_bullish', 'neutral'];
+    // 做空条件
+    const topShortMap = ['bearish', 'strong_bearish', 'neutral'];
     // 3分钟策略主循环
     cron.schedule('*/15 * * * *', async () => {
         try {
@@ -50,11 +62,11 @@ async function startSchedulerTest() {
                         // log(`🔄 处理持仓 币种: ${symbol}, 数量: ${positionAmt}, 平仓方向: ${closeSide}`);
 
                         await placeOrderTestNew(
-                                symbol,
-                                closeSide,
-                                absPositionAmt.toString(),
-                                true // 确认有持仓
-                            );
+                            symbol,
+                            closeSide,
+                            absPositionAmt.toString(),
+                            true // 确认有持仓
+                        );
                         log(`✅ 成功平仓 币种: ${symbol}`);
                     } catch (err) {
                         log(`❌ 平仓失败 币种: ${position.symbol}, 错误: ${err.message}`);
@@ -75,7 +87,7 @@ async function startSchedulerTest() {
                 const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
 
                 // 处理做多交易
-                if (topLong.length > 0) {
+                if (topLong.length > 0 && topLongMap.includes(marketTrend.trend)) {
                     // log(`📈 发现 ${topLong.length} 个做多机会`);
                     for (const long of topLong) {
                         try {
@@ -94,7 +106,7 @@ async function startSchedulerTest() {
                 }
 
                 // 处理做空交易
-                if (topShort.length > 0) {
+                if (topShort.length > 0 && topShortMap.includes(marketTrend.trend)) {
                     // log(`📉 发现 ${topShort.length} 个做空机会`);
                     for (const short of topShort) {
                         try {
@@ -224,6 +236,45 @@ async function startSchedulerTest() {
             await sendTelegramMessage(`⚠️ 刷新Top50币种失败: ${err.message}`);
         }
     });
+
+    // 每4小时执行一次市场行情判断
+    cron.schedule('10 */2 * * *', async () => {
+        try {
+            log(`⏰ 开始执行2小时10分钟市场行情判断任务`);
+
+            // 判断市场趋势
+            const marketAnalysis = await checkMarketTrend();
+            marketTrend = {
+                trend: marketAnalysis.trend,
+                confidence: marketAnalysis.confidence,
+                isOneSided: marketAnalysis.isOneSided,
+                lastUpdate: new Date().toISOString()
+            };
+            // 构建消息内容
+            let message = `📊 4小时市场行情分析\n`;
+            message += `⏰ 时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n`;
+            message += `📈 单边行情: ${marketAnalysis.isOneSided ? '是' : '否'}\n`;
+            message += `🧭 趋势方向: ${getTrendText(marketAnalysis.trend)}\n`;
+            message += `✅ 置信度: ${marketAnalysis.confidence}%\n`;
+            message += `🔢 总交易对: ${marketAnalysis.details.summary.total}\n`;
+            message += `📈 上涨数量: ${marketAnalysis.details.summary.up}\n`;
+            message += `📉 下跌数量: ${marketAnalysis.details.summary.down}\n`;
+            message += `📊 平均涨跌幅: ${marketAnalysis.details.summary.averageChange.toFixed(2)}%\n`;
+            message += `⚡ 显著变动比例: ${(marketAnalysis.details.summary.significantRatio * 100).toFixed(1)}%`;
+
+            // 添加市场状态建议
+            message += `\n💡 建议: ${getTradingSuggestion(marketAnalysis)}`;
+
+            // 发送Telegram消息
+            await sendTelegramMessage(message);
+            // log(`✅ 4小时市场行情判断完成`);
+
+        } catch (err) {
+            log(`❌ 市场行情判断失败: ${err.message}`);
+            await sendTelegramMessage(`⚠️ 市场行情判断失败: ${err.message}`);
+        }
+    });
+
 }
 
 

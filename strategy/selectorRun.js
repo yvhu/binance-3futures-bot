@@ -164,12 +164,12 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   const enableTakeProfitByTime = isInTradingTimeRange(config.takeSelectRunTimeRanges);
 
   if (!enableTakeProfitByTime) {
-    const serverTime = new Date();
-    const formattedTime = moment(serverTime)
-      .tz(timezone)
-      .format('YYYY年MM月DD日 HH:mm');
-    sendTelegramMessage(`✅ 当前时段流动性不足不开仓 ${new Date()}, 时间段：${formattedTime}`);
-    log(`🚫 ${symbol} 当前时段流动性不足`);
+    // const serverTime = new Date();
+    // const formattedTime = moment(serverTime)
+    //   .tz(timezone)
+    //   .format('YYYY年MM月DD日 HH:mm');
+    // sendTelegramMessage(`✅ 当前时段流动性不足不开仓 ${new Date()}, 时间段：${formattedTime}`);
+    // log(`🚫 ${symbol} 当前时段流动性不足`);
     return null;
   }
 

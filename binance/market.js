@@ -6,10 +6,15 @@ const { getSymbolPrecision } = require('../utils/cache');
 const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
-// ✅ 获取24小时成交量（已集成 cache.js 中，不重复）
+// 获取24小时价格变化数据
 async function getTopSymbols() {
-  const response = await proxyGet(`${BINANCE_API}${config.binance.endpoints.ticker24hr}`);
-  return response.data;
+  try {
+    const response = await axios.get('https://fapi.binance.com/fapi/v1/ticker/24hr');
+    return response.data;
+  } catch (error) {
+    console.error('获取24小时数据失败:', error.message);
+    return [];
+  }
 }
 
 /**
