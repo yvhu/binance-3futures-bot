@@ -9,8 +9,9 @@ const crypto = require('crypto');
 // 获取24小时价格变化数据
 async function getTopSymbols() {
   try {
-    const response = await axios.get('https://fapi.binance.com/fapi/v1/ticker/24hr');
-    return response.data;
+    const tickerUrl = config.binance.baseUrl + config.binance.endpoints.ticker24hr;
+    const tickerRes = await proxyGet(tickerUrl);
+    return tickerRes.data;
   } catch (error) {
     console.error('获取24小时数据失败:', error.message);
     return [];
