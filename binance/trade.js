@@ -4,14 +4,9 @@ const { sendTelegramMessage } = require('../telegram/messenger');
 const { log } = require('../utils/logger');
 const crypto = require('crypto');
 const { getSymbolPrecision } = require('../utils/cache');
-const { shouldCloseByExitSignal } = require('../indicators/analyzer');
-const { getPosition, setPosition, removePosition, hasPosition } = require('../utils/position');
 const { getCurrentPrice } = require('./market');
 const { getCachedPositionRatio } = require('../utils/cache');
-const { getOrderMode } = require('../utils/state');
-const { db, trade } = require('../db');
 const _ = require('lodash');
-const moment = require('moment-timezone');
 // === 止损参数配置 ===
 const { enableStopLoss, stopLossRate, enableTakeProfit, takeProfitRate } = config.riskControl;
 
@@ -27,7 +22,6 @@ const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
  * @returns {number} 可下单数量（处理过精度），不足最小值返回 0
  */
 async function calcOrderQty(symbol, price) {
-  // const mode = getOrderMode(); // 默认为比例模式
   const mode = 'amount';
   const leverage = config.leverage || 10;
 
@@ -105,10 +99,6 @@ async function getUSDTBalance() {
  * @param {string} leverage 
  */
 async function setLeverage(symbol, leverage) {
-  const timestamp = await getServerTime();
-  log('✅ 获取系统时间');
-  const localTime = Date.now();
-  log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
   const params = new URLSearchParams({
     symbol,
     leverage: leverage.toString(),
@@ -118,330 +108,15 @@ async function setLeverage(symbol, leverage) {
     .createHmac('sha256', config.binance.apiSecret.trim()) // 同样trim()处理
     .update(params.toString())
     .digest('hex');
-  // 检查你的 config.binance 配置是否正确
-  // console.log(`打印杠杆倍数：${config.leverage}`);
-  // console.log(`apiKey: ${config.binance.apiKey}`); // 应该显示你的有效API密钥
-  // console.log(`apiSecret: ${config.binance.apiSecret}`); // 应该显示你的有效API密钥 secret
-  // console.log('生成的签名:', signature); // 调试输出
   const url = `${BINANCE_API}/fapi/v1/leverage?${params.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey.trim() };
   try {
-    // console.log('打印参数url:', url); // 调试输出
-    // console.log('打印参数headers:', headers); // 调试输出
     const res = await proxyPost(url, null, { headers });
     log(`✅ 设置杠杆成功 ${symbol}：${leverage}x`);
     return res.data;
   } catch (error) {
     log(`❌ 设置杠杆失败 ${symbol}:`, error.response?.data || error.message);
     throw error;
-  }
-}
-
-async function getServerTime() {
-  const response = await proxyGet(`${BINANCE_API}/fapi/v1/time`);
-  return response.data.serverTime;
-}
-
-/**
- * 根据持仓情况判断是否需要平仓
- * 条件：
- *  1. 持仓时间超过配置的最大持仓时间
- *  2. 当前技术信号与持仓方向相反，出现反转信号时提前平仓
- *
- * @param {string} symbol 币种交易对，比如 'BTCUSDT'
- */
-async function closePositionIfNeeded(symbol) {
-  // 从本地持仓记录中获取该币种的持仓信息
-  const position = getPosition(symbol);
-  if (!position) {
-    log(`⚠️ ${symbol} 无持仓记录，无需平仓`);
-    return;
-  }
-
-  const now = Date.now();
-  // 计算持仓时长（分钟）
-  const heldMinutes = (now - position.time) / 60000;
-  // 当前持仓方向，BUY 做多，SELL 做空
-  const currentSide = position.side;
-
-  // 是否因持仓时间超限需要平仓
-  let shouldCloseByTime = heldMinutes >= config.maxPositionMinutes;
-  // 是否因当前信号反向需要平仓
-  let shouldCloseBySignal = false;
-
-  try {
-    // 调用策略分析函数，获取当前币种最新做多/做空信号
-    const { shouldLong, shouldShort } = await shouldCloseByExitSignal(symbol, config.interval);
-    log(`⚠️ ${shouldLong}、${shouldShort} 当前信号`);
-    // 如果持仓是做多，但最新信号是做空，则需要平仓
-    if ((currentSide === 'BUY' && shouldShort) ||
-      (currentSide === 'SELL' && shouldLong)) {
-      shouldCloseBySignal = true;
-      log(`🔁 ${symbol} 当前信号与持仓方向相反，准备平仓`);
-      sendTelegramMessage(`🔁 ${symbol} 当前信号反转，准备平仓`);
-    }
-  } catch (error) {
-    // 信号分析失败时记录错误，但不影响平仓判断（可根据需求调整）
-    log(`⚠️ ${symbol} 分析当前信号失败：${error.message}`);
-  }
-
-  // 满足持仓时间超限或信号反转任一条件则执行平仓操作
-  if (shouldCloseByTime || shouldCloseBySignal) {
-    // 平仓方向与当前持仓相反
-    const exitSide = currentSide === 'BUY' ? 'SELL' : 'BUY';
-    // 获取当前最新价格
-    const price = await getCurrentPrice(symbol);
-    log(`🧯 ${symbol} 满足平仓条件，自动平仓 ${exitSide} @ ${price}`);
-    sendTelegramMessage(`⚠️ ${symbol} 触发平仓：${exitSide} @ 价格 ${price}`);
-    log(`开始自动平仓`);
-    try {
-      const timestamp = Date.now();
-      // 构造币安合约下单请求参数（市价单）
-      const data = new URLSearchParams({
-        symbol,
-        side: exitSide,
-        type: 'MARKET',
-        quantity: Math.abs(position.positionAmt),
-        timestamp: String(Date.now()),
-        reduceOnly: 'true',       // 关键参数，确保只减少持仓
-      });
-
-      // 签名生成
-      const signature = crypto
-        .createHmac('sha256', config.binance.apiSecret)
-        .update(data.toString())
-        .digest('hex');
-
-      // 请求 URL
-      const finalUrl = `${BINANCE_API}/fapi/v1/order?${data.toString()}&signature=${signature}`;
-      const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-
-      // 发送下单请求
-      try {
-        const res = await proxyPost(finalUrl, null, { headers });
-        log(`币安平仓接口响应：`, res.data);
-
-        if (res?.status != 200) {
-          log(`⚠️ 订单未完全成交，状态: ${res.data.status}`);
-          sendTelegramMessage(`⚠️ ${symbol} 平仓订单未成交，状态: ${res.data.status}，订单：${res.data.executedQty}，请手动确认`);
-          return;  // 不清理本地持仓，等待后续成交或人工处理
-        }
-
-        // 订单成交成功
-        removePosition(symbol);
-        log(`✅ ${symbol} 平仓成功`);
-        sendTelegramMessage(`✅ ${symbol} 平仓成功`);
-      } catch (error) {
-        log(`❌ ${symbol} 平仓失败:`, error.response?.data || error.message);
-        sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${error.response?.data?.msg || error.message}`);
-      }
-
-    } catch (error) {
-      // 下单失败，记录错误并通知
-      log(`❌ ${symbol} 平仓失败:`, error.response?.data || error.message);
-      sendTelegramMessage(`❌ ${symbol} 平仓失败，原因：${error.response?.data?.msg || error.message}`);
-    }
-  } else {
-    // 不满足平仓条件，输出当前持仓时间信息
-    log(`ℹ️ ${symbol} 持仓 ${heldMinutes.toFixed(1)} 分钟，未达平仓条件`);
-  }
-}
-
-/**
- * 获取账户指定合约交易对的成交记录（userTrades）
- * @param {string} symbol 交易对，如 BTCUSDT
- * @param {number} startTime 过滤起始时间戳（毫秒）
- * @returns {Promise<Array>} 交易记录数组
- */
-async function getAccountTrades(symbol, startTime = 0) {
-  try {
-    const timestamp = Date.now();
-    const params = new URLSearchParams({
-      symbol,
-      timestamp: String(Date.now()),
-      limit: '20',   // 最大100条，最大可调整，币安接口限制
-    });
-    if (startTime > 0) {
-      params.append('startTime', startTime.toString());
-    }
-    // 计算签名
-    const signature = crypto
-      .createHmac('sha256', config.binance.apiSecret)
-      .update(params.toString())
-      .digest('hex');
-
-    const url = `${BINANCE_API}/fapi/v1/userTrades?${params.toString()}&signature=${signature}`;
-    const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-
-    const res = await proxyGet(url, { headers });
-    return res.data || [];
-  } catch (error) {
-    log(`❌ 获取交易记录失败 ${symbol}:`, error.response?.data || error.message);
-    sendTelegramMessage(`❌ 获取交易记录失败 ${symbol}，请检查API权限或网络`);
-    return [];
-  }
-}
-
-/**
- * 获取某个合约币种在指定时间段的亏损平仓记录
- * @param {string} symbol - 合约币种，例如 BTCUSDT
- * @param {number} startTime - 开始时间戳（毫秒）
- * @param {number} endTime - 结束时间戳（毫秒）
- * @returns {Promise<Array>} 亏损平仓记录数组
- */
-async function getLossIncomes(symbol, startTime, endTime) {
-  try {
-    const timestamp = Date.now();
-
-    const params = new URLSearchParams({
-      symbol,
-      incomeType: 'REALIZED_PNL',
-      startTime: startTime.toString(),
-      endTime: endTime.toString(),
-      limit: '100',
-      timestamp: String(Date.now()),
-    });
-
-    const signature = crypto
-      .createHmac('sha256', config.binance.apiSecret)
-      .update(params.toString())
-      .digest('hex');
-
-    const url = `${BINANCE_API}/fapi/v1/income?${params.toString()}&signature=${signature}`;
-    const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
-
-    const res = await proxyGet(url, { headers });
-
-    if (!Array.isArray(res.data)) {
-      log(`❌ ${symbol} 收益记录格式异常`);
-      return [];
-    }
-
-    // 筛选出亏损的记录（income < 0）
-    return res.data.filter(item => parseFloat(item.income) < 0);
-  } catch (error) {
-    log(`❌ 获取 ${symbol} 收益记录失败:`, error.response?.data || error.message);
-    await sendTelegramMessage(`❌ 获取 ${symbol} 收益记录失败，请检查API权限或网络`);
-    return [];
-  }
-}
-
-
-
-/**
- * 清理无效订单并确保每个币种只有最新的止盈止损单
- */
-async function cleanUpOrphanedOrders() {
-  try {
-    await sendTelegramMessage(`⚠️ 30min开始清理无效订单`);
-    // 1. 获取所有持仓
-    const positions = await fetchAllPositions();
-
-    // 2. 获取所有活跃订单
-    const allOpenOrders = await fetchAllOpenOrders();
-
-    // 3. 按交易对分组处理
-    const symbols = _.union(
-      positions.map(p => p.symbol),
-      allOpenOrders.map(o => o.symbol)
-    ).filter(Boolean);
-
-    for (const symbol of symbols) {
-      try {
-        // 4. 处理每个交易对
-        await processSymbolOrders(symbol, positions, allOpenOrders);
-      } catch (error) {
-        log(`❌ ${symbol} 订单清理失败: ${error.message}`);
-      }
-    }
-  } catch (error) {
-    log(`❌ 订单清理全局错误: ${error.message}`);
-  }
-}
-
-/**
- * 处理单个交易对的订单清理
- */
-async function processSymbolOrders(symbol, allPositions, allOpenOrders) {
-  // 1. 获取该交易对的持仓和订单
-  const position = allPositions.find(p => p.symbol === symbol);
-  const symbolOrders = allOpenOrders.filter(o => o.symbol === symbol);
-
-  // 2. 筛选出止盈止损单
-  const stopOrders = symbolOrders.filter(o =>
-    ['STOP_MARKET', 'TAKE_PROFIT_MARKET'].includes(o.type)
-  );
-
-  // 3. 如果没有持仓，撤销所有止盈止损单
-  if (!position || Number(position.positionAmt) === 0) {
-    await cancelAllStopOrders(symbol, stopOrders);
-    await sendTelegramMessage(`⚠️ 清理${symbol}止盈止损无效订单`);
-    return;
-  }
-
-  // 4. 按类型分组（止盈/止损）
-  const ordersByType = _.groupBy(stopOrders, 'type');
-
-  // 5. 处理每种订单类型
-  for (const [orderType, orders] of Object.entries(ordersByType)) {
-    // 5.1 按时间降序排序
-    const sortedOrders = _.orderBy(orders, ['time'], ['desc']);
-
-    // 5.2 保留最新的一个，撤销其他的
-    if (sortedOrders.length > 1) {
-      const ordersToCancel = sortedOrders.slice(1);
-      await cancelOrders(symbol, ordersToCancel);
-      log(`✅ ${symbol} 保留最新${orderType}订单，撤销${ordersToCancel.length}个旧订单`);
-      await sendTelegramMessage(`⚠️ 清理${symbol}止盈止损旧订单`);
-    }
-  }
-}
-
-/**
- * 撤销所有止盈止损单（无持仓时调用）
- */
-async function cancelAllStopOrders(symbol, orders) {
-  if (orders.length === 0) return;
-
-  const canceledIds = [];
-  for (const order of orders) {
-    try {
-      await cancelOrder(symbol, order.orderId);
-      canceledIds.push(order.orderId);
-    } catch (error) {
-      log(`❌ ${symbol} 订单${order.orderId}撤销失败: ${error.message}`);
-    }
-  }
-
-  if (canceledIds.length > 0) {
-    log(`✅ ${symbol} 无持仓，已撤销${canceledIds.length}个止盈止损单`);
-  }
-}
-
-/**
- * 批量撤销订单
- */
-async function cancelOrders(symbol, orders) {
-  if (orders.length === 0) return;
-
-  // 币安批量撤销API最多支持10个订单
-  const chunks = _.chunk(orders, 10);
-
-  for (const chunk of chunks) {
-    try {
-      await batchCancelOrders(
-        symbol,
-        chunk.map(o => o.orderId)
-      );
-    } catch (error) {
-      log(`❌ ${symbol} 批量撤销失败，尝试单个撤销: ${error.message}`);
-      // 批量失败时回退到单个撤销
-      for (const order of chunk) {
-        await cancelOrder(symbol, order.orderId).catch(e => {
-          log(`❌ ${symbol} 订单${order.orderId}撤销失败: ${e.message}`);
-        });
-      }
-    }
   }
 }
 
@@ -473,14 +148,6 @@ async function fetchOpenOrders() {
   return response.data;
 }
 
-async function fetchAllOpenOrders() {
-  const params = new URLSearchParams({ timestamp: Date.now() });
-  const signature = signParams(params);
-  const url = `${config.binance.baseUrl}/fapi/v1/openOrders?${params}&signature=${signature}`;
-  const res = await proxyGet(url);
-  return res.data;
-}
-
 async function cancelOrder(symbol, orderId) {
   log(`✅ 撤销${symbol} 单号：${orderId} 止盈止损订单`);
   const params = new URLSearchParams({
@@ -492,18 +159,6 @@ async function cancelOrder(symbol, orderId) {
   const url = `${config.binance.baseUrl}/fapi/v1/order?${params.toString()}&signature=${signature}`;
   const headers = { 'X-MBX-APIKEY': config.binance.apiKey };
   return proxyDelete(url, { headers });
-}
-
-async function batchCancelOrders(symbol, orderIds) {
-  const params = new URLSearchParams({
-    symbol,
-    timestamp: String(Date.now()),
-  });
-  orderIds.forEach((id, i) => params.append(`orderIdList[${i}]`, id));
-
-  const signature = signParams(params);
-  const url = `${config.binance.baseUrl}/fapi/v1/batchOrders?${params}&signature=${signature}`;
-  return proxyDelete(url);
 }
 
 function signParams(params) {
@@ -521,12 +176,6 @@ function signParams(params) {
 async function placeOrderTestNew(symbol, side = 'BUY', positionAmt, isPosition) {
   try {
     const price = await getCurrentPrice(symbol);
-    // log('✅ 获取价格');
-    // const timestamp = await getServerTime();
-    // log('✅ 获取系统时间');
-    // const localTime = Date.now();
-    // log("服务器时间:", timestamp, "本地时间:", localTime, "差值:", localTime - timestamp);
-    // log('✅ 设置杠杆symbol：', symbol);
     await setLeverage(symbol, config.leverage);
     const qtyRaw = positionAmt ? parseFloat(positionAmt) : await calcOrderQty(symbol, price);
 
@@ -611,28 +260,6 @@ async function placeOrderTestNew(symbol, side = 'BUY', positionAmt, isPosition) 
   }
 }
 
-async function setupTakeProfitOrder(symbol, side, price) {
-  const precision = getSymbolPrecision(symbol);
-  try {
-    const takeProfitSide = side === 'BUY' ? 'SELL' : 'BUY';
-    const takeProfitPrice = side === 'BUY'
-      ? (price * (1 + takeProfitRate)).toFixed(precision.pricePrecision)
-      : (price * (1 - takeProfitRate)).toFixed(precision.pricePrecision);
-
-    const profitRate = side === 'BUY'
-      ? ((takeProfitPrice / price - 1) * 100 * 10).toFixed(2) + '%'
-      : ((1 - takeProfitPrice / price) * 100 * 10).toFixed(2) + '%';
-
-    // 调用拆分后的API函数
-    await createTakeProfitOrder(symbol, takeProfitSide, takeProfitPrice);
-
-    log(`🎯 已设置止盈单 ${symbol}，触发价: ${takeProfitPrice}`);
-    sendTelegramMessage(`💰 止盈挂单：${symbol} | 方向: ${takeProfitSide} | 触发价: ${takeProfitPrice} | 预计盈利: ${profitRate}`);
-  } catch (error) {
-    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
-  }
-}
-
 // 拆分出的API调用函数
 async function createTakeProfitOrder(symbol, side, stopPrice) {
   const tpParams = new URLSearchParams({
@@ -653,29 +280,6 @@ async function createTakeProfitOrder(symbol, side, stopPrice) {
   const tpRes = await proxyPost(tpUrl, null, { headers: { 'X-MBX-APIKEY': config.binance.apiKey } });
 
   return tpRes;
-}
-
-
-async function setupStopLossOrder(symbol, side, price) {
-  const precision = getSymbolPrecision(symbol);
-  try {
-    const stopSide = side === 'BUY' ? 'SELL' : 'BUY';
-    const stopPrice = side === 'BUY'
-      ? (price * (1 - stopLossRate)).toFixed(precision.pricePrecision)
-      : (price * (1 + stopLossRate)).toFixed(precision.pricePrecision);
-
-    const profitLossRate = side === 'BUY'
-      ? ((stopPrice / price - 1) * 100 * 10).toFixed(2) + '%'
-      : ((1 - stopPrice / price) * 100 * 10).toFixed(2) + '%';
-
-    // 调用拆分后的API函数
-    await createStopLossOrder(symbol, stopSide, stopPrice);
-
-    log(`🛑 已设置止损单 ${symbol}，触发价: ${stopPrice}`);
-    sendTelegramMessage(`📉 止损挂单：${symbol} | 方向: ${stopSide} | 触发价: ${stopPrice} | 预计亏损: ${profitLossRate}`);
-  } catch (error) {
-    log(`❌ 开仓处理失败: ${symbol} ${side}, 错误详情:\n${error.stack}`);
-  }
 }
 
 // 拆分出的API调用函数
@@ -702,15 +306,9 @@ async function createStopLossOrder(symbol, side, stopPrice) {
 
 module.exports = {
   placeOrderTestNew,
-  closePositionIfNeeded,
-  getAccountTrades,
-  getLossIncomes,
-  cleanUpOrphanedOrders,
   fetchAllPositions,
   fetchOpenOrders,
   cancelOrder,
-  setupStopLossOrder,
-  setupTakeProfitOrder,
   createTakeProfitOrder,
   createStopLossOrder,
 };
