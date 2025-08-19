@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const logFile = path.join(__dirname, 'order-test.log');
-const { placeOrder, getLossIncomes, cleanUpOrphanedOrders, placeOrderTestNew } = require('../binance/trade');
 
 async function testOrder() {
     const logMessage = (msg) => {
@@ -14,7 +13,7 @@ async function testOrder() {
     try {
         logMessage('=== 开始测试 ===');
 
-        await placeOrderTestNew(null, '1000SHIBUSDT', 'BUY')
+        // await placeOrderTestNew(null, '1000SHIBUSDT', 'BUY')
 
         logMessage('✅ 消息发送成功');
     } catch (err) {

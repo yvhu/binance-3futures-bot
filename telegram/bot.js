@@ -12,10 +12,7 @@ const { log } = require('../utils/logger');
 
 const { clearSelectedSymbol, cacheSelectedSymbol, cacheTopSymbols } = require('../utils/cache');
 const { getSelectedSymbol } = require('../utils/cache');
-// const { selectBestSymbols } = require('../strategy/selector');
-const { placeOrder } = require('../binance/trade');
 const { refreshPositionsFromBinance, getPosition } = require('../utils/position');
-
 const { setBot } = require('./state');
 const { sendTelegramMessage } = require('./messenger');
 const { getStrategyType, getAllStrategies, setStrategyType } = require('../utils/strategy');
@@ -851,24 +848,6 @@ async function handleCommand(data, chatId) {
   } else if (data === 'refresh_position') {
     await refreshPositionsFromBinance();
     sendTelegramMessage('📦 持仓已刷新（从币安获取最新）');
-  } else if (data.startsWith('long_') || data.startsWith('short_')) {
-    const symbol = data.split('_')[1];
-    const isLong = data.startsWith('long_');
-    const direction = isLong ? '做多' : '做空';
-    cacheSelectedSymbol(symbol);
-    sendTelegramMessage(`📌 已选择币种：${symbol}，方向：${direction}`);
-
-    try {
-      const orderSide = isLong ? 'BUY' : 'SELL';
-      if (serviceStatus.running) {
-        await placeOrder(symbol, orderSide); // 策略运行时才下单
-      } else {
-        sendTelegramMessage('⚠️ 当前策略已暂停，仅缓存选币，不会下单');
-      }
-    } catch (err) {
-      console.error(`下单失败: ${symbol}`, err.message);
-    }
-    refreshPositionsFromBinance()
   } else if (data === 'clear_selected') {
     clearSelectedSymbol();
     sendTelegramMessage('🧹 已清空选中币种缓存');
