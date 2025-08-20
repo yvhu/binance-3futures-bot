@@ -118,39 +118,6 @@ function simpleMA(data, period) {
   return sum / period;
 }
 
-// 趋势文本转换函数
-function getTrendText(trend) {
-  const trendMap = {
-    'bullish': '上涨',
-    'bearish': '下跌',
-    'strong_bullish': '强烈上涨',
-    'strong_bearish': '强烈下跌',
-    'neutral': '震荡',
-    'error': '错误'
-  };
-  return trendMap[trend] || trend;
-}
-
-// 交易建议函数
-function getTradingSuggestion(marketAnalysis) {
-  if (!marketAnalysis.isOneSided) {
-    return "市场震荡，建议观望或短线操作";
-  }
-
-  switch (marketAnalysis.trend) {
-    case 'strong_bullish':
-      return "强烈单边上涨，可考虑顺势做多";
-    case 'bullish':
-      return "单边上涨行情，适合多头策略";
-    case 'strong_bearish':
-      return "强烈单边下跌，可考虑顺势做空";
-    case 'bearish':
-      return "单边下跌行情，适合空头策略";
-    default:
-      return "市场状态不明，建议谨慎操作";
-  }
-}
-
 module.exports = {
   isInTradingTimeRange,
   calculateATR,
@@ -158,6 +125,4 @@ module.exports = {
   fetchKLines,
   calculateTrendStrength,
   simpleMA,
-  getTrendText,
-  getTradingSuggestion,
 };
