@@ -71,9 +71,11 @@ async function startSchedulerTest() {
             // ==================== 开仓逻辑 ====================
             try {
                 log('\n=== 开仓任务 ===');
+                const startTime = Date.now();
                 const topSymbols = getCachedTopSymbols();
                 const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
-
+                const selectionTime = Date.now();
+                log(`⏱️ 选币耗时: ${selectionTime - startTime}ms`);
                 // 处理做多交易
                 if (topLong.length > 0) {
                     // log(`📈 发现 ${topLong.length} 个做多机会`);
@@ -111,6 +113,15 @@ async function startSchedulerTest() {
                 } else {
                     log(`📈 未发现做空机会`);
                 }
+                const totalTime = Date.now() - startTime;
+                log(`⏱️ 开仓任务总耗时: ${totalTime}ms`);
+                // 添加性能警告
+                if (totalTime > 30000) {
+                    log(`⚠️ 警告: 开仓任务耗时超过30秒，可能影响交易时机`);
+                } else if (totalTime > 15000) {
+                    log(`⚠️ 注意: 开仓任务耗时较长，请关注性能`);
+                }
+
             } catch (err) {
                 log(`❌ 开仓策略执行失败: ${err.message}`);
             }

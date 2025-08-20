@@ -10,7 +10,7 @@ const { isFlatMarket, dynamicPriceRangeRatio, calculateADX } = require('../utils
 const { proxyGet, proxyPost, proxyDelete } = require('../utils/request');
 const { getCurrentPrice } = require('../binance/market');
 const moment = require('moment-timezone');
-const {isInTradingTimeRange } = require('../utils/utils');
+const { isInTradingTimeRange } = require('../utils/utils');
 
 // 获取指定币种的 K 线数据（默认获取 50 根）
 async function fetchKlines(symbol, interval, limit = 50) {
@@ -47,8 +47,8 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   });
   // 统计震荡幅度大于0.6%的K线数量
   const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
-   // 直接要求平均振幅>0.6%
-  const isConditionMet = avgOscillation > 0.6; 
+  // 直接要求平均振幅>0.6%
+  const isConditionMet = avgOscillation > 0.6;
   if (!isConditionMet) {
     log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
@@ -292,10 +292,19 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
     try {
       const res = await evaluateSymbolWithScore(symbol, interval);
       if (!res) continue;
-      if (res?.side === 'LONG') longList.push(res);
-      if (res?.side === 'SHORT') shortList.push(res);
-      // if (res?.side === 'LONG') shortList.push(res);
-      // if (res?.side === 'SHORT') longList.push(res);
+
+      // 添加3分钟级别确认
+      const confirmedBy3M = await confirmWith3Minute(res.symbol, res.side, res.price);
+
+      if (confirmedBy3M) {
+        if (res?.side === 'LONG') longList.push(res);
+        if (res?.side === 'SHORT') shortList.push(res);
+        // if (res.side === 'LONG') longList.push({ ...res, confirmedBy3M });
+        // if (res.side === 'SHORT') shortList.push({ ...res, confirmedBy3M });
+      } else {
+        log(`⚠️ ${res.symbol} ${res.side}信号未通过3分钟确认`);
+      }
+
     } catch (err) {
       log(`❌ ${symbol} 评估失败: ${err.message}`);
     }
@@ -305,4 +314,137 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
   return { topLong, topShort };
 }
 
-module.exports = { getTopLongShortSymbols, getTopLongShortSymbolsTest };
+// 3分钟级别确认函数
+async function confirmWith3Minute(symbol, side, entryPrice) {
+  try {
+    // 获取3分钟K线数据
+    const klines3m = (await fetchKlines(symbol, '3m', 21)).slice(0, -1);
+    if (!klines3m || klines3m.length < 20) return false;
+
+    const close3m = klines3m.map(k => Number(k.close));
+    const high3m = klines3m.map(k => Number(k.high));
+    const low3m = klines3m.map(k => Number(k.low));
+    const volume3m = klines3m.map(k => Number(k.volume));
+
+    // 计算3分钟级别指标
+    const ema5_3m = EMA.calculate({ period: 5, values: close3m });
+    const ema10_3m = EMA.calculate({ period: 10, values: close3m });
+    const currentPrice3m = close3m[close3m.length - 1];
+
+    // 获取当前价格
+    const currentMarketPrice = await getCurrentPrice(symbol);
+
+    if (side === 'LONG') {
+      return confirmLong3M(
+        close3m, high3m, low3m, volume3m,
+        ema5_3m, ema10_3m, currentPrice3m, currentMarketPrice, entryPrice
+      );
+    } else {
+      return confirmShort3M(
+        close3m, high3m, low3m, volume3m,
+        ema5_3m, ema10_3m, currentPrice3m, currentMarketPrice, entryPrice
+      );
+    }
+
+  } catch (error) {
+    log(`❌ ${symbol} 3分钟确认失败: ${error.message}`);
+    return false;
+  }
+}
+
+// 多头3分钟确认逻辑
+function confirmLong3M(close, high, low, volume, ema5, ema10, currentPrice, marketPrice, entryPrice) {
+  const lastIndex = close.length - 1;
+
+  // 1. 价格确认：当前价格应该在EMA之上
+  if (currentPrice < ema5[lastIndex] || currentPrice < ema10[lastIndex]) {
+    return false;
+  }
+
+  // 2. 趋势确认：短期EMA在长期EMA之上
+  if (ema5[lastIndex] <= ema10[lastIndex]) {
+    return false;
+  }
+
+  // 3. 动量确认：最近3根K线至少2根收阳
+  const recentCandles = close.slice(-3);
+  const positiveCandles = recentCandles.filter((price, index, arr) => {
+    return index === 0 || price > arr[index - 1];
+  }).length;
+
+  if (positiveCandles < 2) {
+    return false;
+  }
+
+  // 4. 成交量确认：最近成交量不萎缩
+  const recentVolume = volume.slice(-3);
+  const avgVolume = recentVolume.reduce((a, b) => a + b, 0) / recentVolume.length;
+  const prevAvgVolume = volume.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
+
+  if (avgVolume < prevAvgVolume * 0.7) {
+    return false;
+  }
+
+  // 5. 价格位置确认：不要追得太高
+  const priceDeviation = (marketPrice - entryPrice) / entryPrice;
+  if (priceDeviation > 0.01) { // 如果已经涨超过1%，放弃
+    return false;
+  }
+
+  // 6. 回调确认：最好有小的回调
+  const recentHigh = Math.max(...high.slice(-5));
+  const pullback = (recentHigh - marketPrice) / recentHigh;
+  const hasHealthyPullback = pullback > 0.002 && pullback < 0.01; // 0.2%-1%的回调
+
+  return hasHealthyPullback || priceDeviation <= 0.003; // 要么有健康回调，要么涨幅很小
+}
+
+// 空头3分钟确认逻辑
+function confirmShort3M(close, high, low, volume, ema5, ema10, currentPrice, marketPrice, entryPrice) {
+  const lastIndex = close.length - 1;
+
+  // 1. 价格确认：当前价格应该在EMA之下
+  if (currentPrice > ema5[lastIndex] || currentPrice > ema10[lastIndex]) {
+    return false;
+  }
+
+  // 2. 趋势确认：短期EMA在长期EMA之下
+  if (ema5[lastIndex] >= ema10[lastIndex]) {
+    return false;
+  }
+
+  // 3. 动量确认：最近3根K线至少2根收阴
+  const recentCandles = close.slice(-3);
+  const negativeCandles = recentCandles.filter((price, index, arr) => {
+    return index === 0 || price < arr[index - 1];
+  }).length;
+
+  if (negativeCandles < 2) {
+    return false;
+  }
+
+  // 4. 成交量确认：下跌放量或反弹缩量
+  const recentVolume = volume.slice(-3);
+  const avgVolume = recentVolume.reduce((a, b) => a + b, 0) / recentVolume.length;
+  const prevAvgVolume = volume.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
+
+  // 下跌时放量最好，或者至少不缩量
+  if (avgVolume < prevAvgVolume * 0.6) {
+    return false;
+  }
+
+  // 5. 价格位置确认：不要追得太低
+  const priceDeviation = (entryPrice - marketPrice) / entryPrice;
+  if (priceDeviation > 0.01) { // 如果已经跌超过1%，放弃
+    return false;
+  }
+
+  // 6. 反弹确认：最好有小的反弹
+  const recentLow = Math.min(...low.slice(-5));
+  const bounce = (marketPrice - recentLow) / recentLow;
+  const hasHealthyBounce = bounce > 0.002 && bounce < 0.01; // 0.2%-1%的反弹
+
+  return hasHealthyBounce || priceDeviation <= 0.003; // 要么有健康反弹，要么跌幅很小
+}
+
+module.exports = { getTopLongShortSymbols, getTopLongShortSymbolsTest, fetchKlines };
