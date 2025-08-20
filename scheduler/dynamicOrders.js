@@ -10,11 +10,7 @@ const moment = require('moment-timezone');
 const { createTakeProfitOrder, createStopLossOrder, } = require('../binance/trade')
 const { calculateTrendStrength, simpleMA } = require('../utils/utils')
 const { getCurrentPrice } = require('../binance/market')
-
-// 动态止盈止损配置
-const DYNAMIC_SL_RATIO = 0.8; // 止损ATR倍数
-const DYNAMIC_TP_RATIO = 1.5;  // 止盈ATR倍数
-const SUPPORT_RESISTANCE_BUFFER = 0.002; // 支撑阻力位缓冲(0.2%)
+const { EMA, BollingerBands } = require('technicalindicators');
 
 /**
  * 获取K线数据
