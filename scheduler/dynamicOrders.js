@@ -221,6 +221,9 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
         // 基础止盈计算
         let dynamicTakeProfit = entryPrice + dynamicRange * dynamicCoefficient;
 
+        // 确保止盈价格不低于当前价格
+        dynamicTakeProfit = Math.max(dynamicTakeProfit, lastClose);
+
         // 阻力位约束
         if (supportResistance.resistance) {
             dynamicTakeProfit = Math.min(
@@ -247,7 +250,6 @@ async function calculateDynamicPrices(symbol, side, entryPrice) {
         };
     } else {
         // ============= 做空场景 =============
-        // （保持您原有的做空逻辑不变）
         const dynamicTakeProfit = isUptrend
             ? Math.max(
                 entryPrice - dynamicRange * DYNAMIC_TP_RATIO,
