@@ -58,8 +58,8 @@ module.exports = {
     { start: "04:00", end: "05:00" },
     { start: "05:00", end: "06:00" },
     { start: "06:00", end: "07:00" },
-    // { start: "07:00", end: "08:00" },
-    // { start: "08:00", end: "09:00" },
+    { start: "07:00", end: "08:00" },
+    { start: "08:00", end: "09:00" },
     { start: "09:00", end: "10:00" },
     { start: "10:00", end: "11:00" },
     { start: "11:00", end: "12:00" },
@@ -74,7 +74,7 @@ module.exports = {
     { start: "20:00", end: "21:00" },
     { start: "21:00", end: "22:00" },
     { start: "22:00", end: "23:00" },
-    // { start: "23:00", end: "24:00" },
+    { start: "23:00", end: "24:00" },
   ],
 
   // takeSelectRunTimeRanges: [
