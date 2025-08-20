@@ -47,7 +47,7 @@ async function initTelegramBot() {
     }
   });
 
-  await sendMainMenu();
+  // await sendMainMenu();
 }
 
 /**
@@ -76,14 +76,13 @@ async function sendMainMenu() {
  * @param {number} chatId 用户聊天 ID
  */
 async function handleCommand(data, chatId) {
-  if (data === 'start') {
-    sendTelegramMessage('✅ 策略已启动');
-  } else if (data === 'stop') {
-    sendTelegramMessage('⏸ 策略已暂停');
-  }
+  // if (data === 'start') {
+  //   sendTelegramMessage('✅ 策略已启动');
+  // } else if (data === 'stop') {
+  //   sendTelegramMessage('⏸ 策略已暂停');
+  // }
 }
 
 module.exports = {
   initTelegramBot,
-  // sendTelegramMessage,   // 方便外部直接发送消息（内部会通过 state 获取bot）
 };

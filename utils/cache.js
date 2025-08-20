@@ -84,38 +84,38 @@ const getCachedTopSymbols = () => {
 
 // 添加币种到 top50 缓存 addToTopSymbols('WIFUSDT');
 
-function addToTopSymbols(symbol) {
-  const filePath = config.cachePaths.top50;
-  let topSymbols = [];
+// function addToTopSymbols(symbol) {
+//   const filePath = config.cachePaths.top50;
+//   let topSymbols = [];
 
-  if (fs.existsSync(filePath)) {
-    topSymbols = JSON.parse(fs.readFileSync(filePath));
-  }
+//   if (fs.existsSync(filePath)) {
+//     topSymbols = JSON.parse(fs.readFileSync(filePath));
+//   }
 
-  if (!topSymbols.includes(symbol)) {
-    topSymbols.push(symbol);
-    fs.writeFileSync(filePath, JSON.stringify(topSymbols, null, 2));
-    // log(`✅ 已添加 ${symbol} 到 topSymbols`);
-  } else {
-    log(`ℹ️ ${symbol} 已存在于 topSymbols`);
-  }
-}
+//   if (!topSymbols.includes(symbol)) {
+//     topSymbols.push(symbol);
+//     fs.writeFileSync(filePath, JSON.stringify(topSymbols, null, 2));
+//     // log(`✅ 已添加 ${symbol} 到 topSymbols`);
+//   } else {
+//     log(`ℹ️ ${symbol} 已存在于 topSymbols`);
+//   }
+// }
 
 // 从 top50 缓存中移除币种 removeFromTopSymbols('DOGEUSDT');
-function removeFromTopSymbols(symbol) {
-  const filePath = config.cachePaths.top50;
-  if (!fs.existsSync(filePath)) return;
+// function removeFromTopSymbols(symbol) {
+//   const filePath = config.cachePaths.top50;
+//   if (!fs.existsSync(filePath)) return;
 
-  let topSymbols = JSON.parse(fs.readFileSync(filePath));
-  const updated = topSymbols.filter(s => s !== symbol);
+//   let topSymbols = JSON.parse(fs.readFileSync(filePath));
+//   const updated = topSymbols.filter(s => s !== symbol);
 
-  if (updated.length !== topSymbols.length) {
-    fs.writeFileSync(filePath, JSON.stringify(updated, null, 2));
-    // log(`🗑️ 已移除 ${symbol} 从 topSymbols`);
-  } else {
-    log(`⚠️ ${symbol} 不存在于 topSymbols`);
-  }
-}
+//   if (updated.length !== topSymbols.length) {
+//     fs.writeFileSync(filePath, JSON.stringify(updated, null, 2));
+//     // log(`🗑️ 已移除 ${symbol} 从 topSymbols`);
+//   } else {
+//     log(`⚠️ ${symbol} 不存在于 topSymbols`);
+//   }
+// }
 
 // 获取某币种的精度信息
 const getSymbolPrecision = (symbol) => {
@@ -130,33 +130,33 @@ const getSymbolPrecision = (symbol) => {
 };
 
 // 缓存手动选择的币种
-const cacheSelectedSymbol = (symbol) => {
-  fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({ symbol, time: Date.now() }, null, 2));
-  // log(`📌 缓存已选币种: ${symbol}`);
-};
+// const cacheSelectedSymbol = (symbol) => {
+//   fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({ symbol, time: Date.now() }, null, 2));
+//   // log(`📌 缓存已选币种: ${symbol}`);
+// };
 
 // 读取选中的币种
-const getSelectedSymbol = () => {
-  if (!fs.existsSync(config.cachePaths.selectedSymbol)) return null;
-  const { symbol } = JSON.parse(fs.readFileSync(config.cachePaths.selectedSymbol));
-  return symbol || null;
-};
+// const getSelectedSymbol = () => {
+//   if (!fs.existsSync(config.cachePaths.selectedSymbol)) return null;
+//   const { symbol } = JSON.parse(fs.readFileSync(config.cachePaths.selectedSymbol));
+//   return symbol || null;
+// };
 
 // 清空已选币种缓存文件内容
-const clearSelectedSymbol = () => {
-  if (fs.existsSync(config.cachePaths.selectedSymbol)) {
-    fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({}, null, 2));
-    // log('🧹 已清空已选币种缓存文件内容');
-  } else {
-    log('ℹ️ 已选币种缓存文件不存在，无需清空');
-  }
-};
+// const clearSelectedSymbol = () => {
+//   if (fs.existsSync(config.cachePaths.selectedSymbol)) {
+//     fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({}, null, 2));
+//     // log('🧹 已清空已选币种缓存文件内容');
+//   } else {
+//     log('ℹ️ 已选币种缓存文件不存在，无需清空');
+//   }
+// };
 
 // 缓存 仓位比例
-function cachePositionRatio(ratio) {
-  const filePath = path.resolve(config.cachePaths.patio || './cache/ratio.json');
-  fs.writeFileSync(filePath, JSON.stringify({ ratio }), 'utf-8');
-}
+// function cachePositionRatio(ratio) {
+//   const filePath = path.resolve(config.cachePaths.patio || './cache/ratio.json');
+//   fs.writeFileSync(filePath, JSON.stringify({ ratio }), 'utf-8');
+// }
 
 // 获取仓位比例
 function getCachedPositionRatio() {
@@ -173,12 +173,12 @@ function getCachedPositionRatio() {
 module.exports = {
   cacheTopSymbols,
   getCachedTopSymbols,
-  cacheSelectedSymbol,
-  getSelectedSymbol,
+  // cacheSelectedSymbol,
+  // getSelectedSymbol,
   getSymbolPrecision,
-  clearSelectedSymbol,
-  cachePositionRatio,
+  // clearSelectedSymbol,
+  // cachePositionRatio,
   getCachedPositionRatio,
-  addToTopSymbols,
-  removeFromTopSymbols,
+  // addToTopSymbols,
+  // removeFromTopSymbols,
 };
