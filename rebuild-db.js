@@ -22,10 +22,10 @@ const db = new Database(DB_PATH);
 function initTables() {
     try {
         // 初始化 hourly_stats 表
-        require('./db/hourlyStats.js').init(db);
+        // require('./db/hourlyStats.js').init(db);
         
         // 初始化其他表
-        require('./db/trade.js').init(db);
+        // require('./db/trade.js').init(db);
         require('./db/log.js').init(db);
         
         console.log('✅ 所有表初始化完成');

@@ -72,7 +72,7 @@ async function startSchedulerTest() {
                 log('\n=== 开仓任务 ===');
                 const startTime = Date.now();
                 const topSymbols = getCachedTopSymbols();
-                const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
+                const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 5, config.interval);
                 const selectionTime = Date.now();
                 log(`⏱️ 选币耗时: ${selectionTime - startTime}ms`);
                 // 处理做多交易

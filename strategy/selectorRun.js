@@ -213,9 +213,9 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
       if (!res) continue;
 
       // 添加调试信息
-      console.log(`${symbol} - ${res.side} - 得分: ${res.score} - 价格: ${res.price}`);
-      console.log(`  EMA5: ${res.indicators.ema5}, EMA13: ${res.indicators.ema13}`);
-      console.log(`  VWAP: ${res.indicators.vwap}, 布林中轨: ${res.indicators.bollinger.middle}`);
+      // console.log(`${symbol} - ${res.side} - 得分: ${res.score} - 价格: ${res.price}`);
+      // console.log(`  EMA5: ${res.indicators.ema5}, EMA13: ${res.indicators.ema13}`);
+      // console.log(`  VWAP: ${res.indicators.vwap}, 布林中轨: ${res.indicators.bollinger.middle}`);
 
       if (res.side === 'LONG') longList.push(res);
       if (res.side === 'SHORT') shortList.push(res);
@@ -225,10 +225,8 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
     }
   }
 
-  // const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
-  // const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
-  const topLong = longList.sort((a, b) => b.score - a.score);
-  const topShort = shortList.sort((a, b) => b.score - a.score);
+  const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
+  const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
 
   return { topLong, topShort };
 }
