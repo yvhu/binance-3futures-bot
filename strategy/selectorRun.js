@@ -292,18 +292,19 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
     try {
       const res = await evaluateSymbolWithScore(symbol, interval);
       if (!res) continue;
-
+      if (res?.side === 'LONG') longList.push(res);
+      if (res?.side === 'SHORT') shortList.push(res);
       // 添加3分钟级别确认
-      const confirmedBy3M = await confirmWith3Minute(res.symbol, res.side, res.price);
+      // const confirmedBy3M = await confirmWith3Minute(res.symbol, res.side, res.price);
 
-      if (confirmedBy3M) {
-        if (res?.side === 'LONG') longList.push(res);
-        if (res?.side === 'SHORT') shortList.push(res);
-        // if (res.side === 'LONG') longList.push({ ...res, confirmedBy3M });
-        // if (res.side === 'SHORT') shortList.push({ ...res, confirmedBy3M });
-      } else {
-        log(`⚠️ ${res.symbol} ${res.side}信号未通过3分钟确认`);
-      }
+      // if (confirmedBy3M) {
+      //   if (res?.side === 'LONG') longList.push(res);
+      //   if (res?.side === 'SHORT') shortList.push(res);
+      //   // if (res.side === 'LONG') longList.push({ ...res, confirmedBy3M });
+      //   // if (res.side === 'SHORT') shortList.push({ ...res, confirmedBy3M });
+      // } else {
+      //   log(`⚠️ ${res.symbol} ${res.side}信号未通过3分钟确认`);
+      // }
 
     } catch (err) {
       log(`❌ ${symbol} 评估失败: ${err.message}`);
