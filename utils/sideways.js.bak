@@ -1,4 +1,4 @@
-const { log } = require('../utils/logger');
+const { log } = require('./logger');
 /**
  * 判断是否处于横盘震荡状态（结合价格标准差 + 布林带宽度 + 横盘持续时间）
  * @param {Array<number>} closePrices - 收盘价数组（至少 N + period 条）
