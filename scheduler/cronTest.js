@@ -87,7 +87,8 @@ async function startSchedulerTest() {
                 const { topLong, topShort } = await getTopLongShortSymbolsTest(topSymbols, 1, config.interval);
 
                 // 处理做多交易
-                if (topLong.length > 0 && topLongMap.includes(marketTrend.trend)) {
+                // if (topLong.length > 0 && topLongMap.includes(marketTrend.trend)) {
+                if (topLong.length > 0) {
                     // log(`📈 发现 ${topLong.length} 个做多机会`);
                     for (const long of topLong) {
                         try {
@@ -106,7 +107,8 @@ async function startSchedulerTest() {
                 }
 
                 // 处理做空交易
-                if (topShort.length > 0 && topShortMap.includes(marketTrend.trend)) {
+                // if (topShort.length > 0 && topShortMap.includes(marketTrend.trend)) {
+                if (topShort.length > 0) {
                     // log(`📉 发现 ${topShort.length} 个做空机会`);
                     for (const short of topShort) {
                         try {
@@ -238,7 +240,7 @@ async function startSchedulerTest() {
     });
 
     // 每4小时执行一次市场行情判断
-    cron.schedule('10 */2 * * *', async () => {
+    cron.schedule('*/20 * * * *', async () => {
         try {
             log(`⏰ 开始执行2小时10分钟市场行情判断任务`);
 
