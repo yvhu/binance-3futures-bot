@@ -95,7 +95,7 @@ function addToTopSymbols(symbol) {
   if (!topSymbols.includes(symbol)) {
     topSymbols.push(symbol);
     fs.writeFileSync(filePath, JSON.stringify(topSymbols, null, 2));
-    log(`✅ 已添加 ${symbol} 到 topSymbols`);
+    // log(`✅ 已添加 ${symbol} 到 topSymbols`);
   } else {
     log(`ℹ️ ${symbol} 已存在于 topSymbols`);
   }
@@ -111,7 +111,7 @@ function removeFromTopSymbols(symbol) {
 
   if (updated.length !== topSymbols.length) {
     fs.writeFileSync(filePath, JSON.stringify(updated, null, 2));
-    log(`🗑️ 已移除 ${symbol} 从 topSymbols`);
+    // log(`🗑️ 已移除 ${symbol} 从 topSymbols`);
   } else {
     log(`⚠️ ${symbol} 不存在于 topSymbols`);
   }
@@ -119,7 +119,7 @@ function removeFromTopSymbols(symbol) {
 
 // 获取某币种的精度信息
 const getSymbolPrecision = (symbol) => {
-  console.log('缓存文件路径:', config.cachePaths.precision); // 调试输出路径
+  // console.log('缓存文件路径:', config.cachePaths.precision); // 调试输出路径
   if (!fs.existsSync(config.cachePaths.precision)) {
     console.error('❌ 缓存文件不存在:', config.cachePaths.precision);
     return null;
@@ -132,7 +132,7 @@ const getSymbolPrecision = (symbol) => {
 // 缓存手动选择的币种
 const cacheSelectedSymbol = (symbol) => {
   fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({ symbol, time: Date.now() }, null, 2));
-  log(`📌 缓存已选币种: ${symbol}`);
+  // log(`📌 缓存已选币种: ${symbol}`);
 };
 
 // 读取选中的币种
@@ -146,7 +146,7 @@ const getSelectedSymbol = () => {
 const clearSelectedSymbol = () => {
   if (fs.existsSync(config.cachePaths.selectedSymbol)) {
     fs.writeFileSync(config.cachePaths.selectedSymbol, JSON.stringify({}, null, 2));
-    log('🧹 已清空已选币种缓存文件内容');
+    // log('🧹 已清空已选币种缓存文件内容');
   } else {
     log('ℹ️ 已选币种缓存文件不存在，无需清空');
   }
