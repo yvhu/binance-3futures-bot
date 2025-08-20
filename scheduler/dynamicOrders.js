@@ -121,14 +121,12 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 if (side === 'BUY') {
                     // 多单止盈应高于当前价
                     if (takeProfit <= currentPrice) {
-                        // validatedTakeProfit = currentPrice * 1.005; // 调整为高于当前价0.5%
                         validatedTakeProfit = adjustPrecision(symbol, currentPrice * 1.005),
                             log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
                 } else {
                     // 空单止盈应低于当前价
                     if (takeProfit >= currentPrice) {
-                        // validatedTakeProfit = currentPrice * 0.995; // 调整为低于当前价0.5%
                         validatedTakeProfit = adjustPrecision(symbol, currentPrice * 0.995),
                             log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
                     }
