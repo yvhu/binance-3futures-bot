@@ -50,7 +50,7 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // 直接要求平均振幅>0.6%
   const isConditionMet = avgOscillation > 0.6;
   if (!isConditionMet) {
-    log(`❌ ${symbol} 震荡幅度太小即过滤`);
+    // log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
   }
   if (!klines || klines.length < 50) return null;
@@ -144,7 +144,7 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // ========== 横盘震荡过滤 ==========
   const flat = isFlatMarket({ close, high, low }, 0.005, baseRatio);
   if (flat) {
-    log(`🚫 ${symbol} 横盘震荡过滤`);
+    // log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
   }
 
