@@ -117,7 +117,7 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // ========== 成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
-  
+
   const isVolumeSpike = (volumeRatio > 1.4 || volumeEMARatio > 1.4) || lastVolume > avgVolume + 1.2 * volumeStdDev;
   const isVolumeDecline = (volumeRatio < 0.9 || volumeEMARatio < 0.9) || lastVolume < avgVolume - 1.0 * volumeStdDev;
 
@@ -162,7 +162,7 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // EMA金叉死叉确认（修复：确保是最近发生的）
   const prevEma5 = alignedEma5[minLength - 2];
   const prevEma13 = alignedEma13[minLength - 2];
-  
+
   if (lastEma5 > lastEma13 && prevEma5 <= prevEma13) longScore += 2; // 金叉
   if (lastEma5 < lastEma13 && prevEma5 >= prevEma13) shortScore += 2; // 死叉
 
@@ -211,12 +211,12 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
     try {
       const res = await evaluateSymbolWithScore(symbol, interval);
       if (!res) continue;
-      
+
       // 添加调试信息
       console.log(`${symbol} - ${res.side} - 得分: ${res.score} - 价格: ${res.price}`);
       console.log(`  EMA5: ${res.indicators.ema5}, EMA13: ${res.indicators.ema13}`);
       console.log(`  VWAP: ${res.indicators.vwap}, 布林中轨: ${res.indicators.bollinger.middle}`);
-      
+
       if (res.side === 'LONG') longList.push(res);
       if (res.side === 'SHORT') shortList.push(res);
 
@@ -224,10 +224,12 @@ async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
       console.log(`❌ ${symbol} 评估失败: ${err.message}`);
     }
   }
-  
-  const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
-  const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
-  
+
+  // const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
+  // const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
+  const topLong = longList.sort((a, b) => b.score - a.score);
+  const topShort = shortList.sort((a, b) => b.score - a.score);
+
   return { topLong, topShort };
 }
 
