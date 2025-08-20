@@ -22,30 +22,18 @@ const BINANCE_API = config.binance.baseUrl || 'https://fapi.binance.com';
  * @returns {number} 可下单数量（处理过精度），不足最小值返回 0
  */
 async function calcOrderQty(symbol, price) {
-  const mode = 'amount';
   const leverage = config.leverage || 10;
-
   let usdtBalance = 100000000;
   let usdtAmount = 0;
+  // ===== 固定金额模式 =====
+  const fixedAmount = config.fixedAmountUSDT || 10;
 
-  if (mode === 'amount') {
-    // ===== 固定金额模式 =====
-    const fixedAmount = config.fixedAmountUSDT || 10;
-
-    if (usdtBalance < fixedAmount) {
-      log(`❌ 余额不足固定下单金额：${usdtBalance} < ${fixedAmount}，跳过下单`);
-      return 0;
-    }
-
-    usdtAmount = fixedAmount;
-    log(`📌 使用固定金额模式下单：${fixedAmount} USDT`);
-  } else {
-    // ===== 比例模式 =====
-    const cachedRatio = getCachedPositionRatio();
-    const ratio = cachedRatio !== null ? cachedRatio : config.positionRatio || 1;
-    usdtAmount = usdtBalance * ratio;
-    log(`📌 使用比例下单模式：余额=${usdtBalance}，比例=${ratio * 100}% → 金额=${usdtAmount.toFixed(2)} USDT`);
+  if (usdtBalance < fixedAmount) {
+    log(`❌ 余额不足固定下单金额：${usdtBalance} < ${fixedAmount}，跳过下单`);
+    return 0;
   }
+
+  usdtAmount = fixedAmount;
 
   // === 计算原始张数（未处理精度）===
   let rawQty = (usdtAmount * leverage) / price;
