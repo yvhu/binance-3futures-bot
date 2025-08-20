@@ -5,7 +5,7 @@ const logFile = path.join(__dirname, 'telegram-test.log');
 
 async function testTelegram() {
     // 先引入 initTelegramBot 和 sendTelegramMessage
-    const { sendTelegramMessage } = require('../telegram/messenger');
+    // const { sendTelegramMessage } = require('../telegram/messenger');
 
     const logMessage = (msg) => {
         const timestamp = new Date().toISOString();
@@ -18,10 +18,10 @@ async function testTelegram() {
         logMessage('=== 开始测试 ===');
 
         // 先初始化 bot，等待完成（建立长轮询连接）
-        await initTelegramBot();
+        // await initTelegramBot();
 
         // 初始化完成后发送测试消息
-        await sendTelegramMessage('🛠️ 测试消息 from standalone script');
+        // await sendTelegramMessage('🛠️ 测试消息 from standalone script');
 
         logMessage('✅ 消息发送成功');
     } catch (err) {

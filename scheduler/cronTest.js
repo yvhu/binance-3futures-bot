@@ -1,6 +1,5 @@
 const cron = require('node-cron');
 const { log } = require('../utils/logger');
-const { serviceStatus } = require('../telegram/bot');
 const { getTopLongShortSymbolsTest } = require('../strategy/selectorRun');
 const { placeOrderTestNew, fetchAllPositions, fetchOpenOrders, cancelOrder } = require('../binance/trade');
 
@@ -82,10 +81,7 @@ async function startSchedulerTest() {
                     for (const long of topLong) {
                         try {
                             // log(`尝试做多: ${long.symbol}`);
-                            if (serviceStatus.running) {
-                                // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(long.symbol, 'BUY', null, false);
-                            }
+                            await placeOrderTestNew(long.symbol, 'BUY', null, false);
                             // log(`✅ 做多成功: ${long.symbol}`);
                         } catch (err) {
                             log(`❌ 做多下单失败：${long.symbol}，原因: ${err.message}`);
@@ -101,10 +97,7 @@ async function startSchedulerTest() {
                     for (const short of topShort) {
                         try {
                             // log(`尝试做空: ${short.symbol}`);
-                            if (serviceStatus.running) {
-                                // log(`✅ 进入真实交易`);
-                                await placeOrderTestNew(short.symbol, 'SELL', null, false);
-                            }
+                            await placeOrderTestNew(short.symbol, 'SELL', null, false);
                             // log(`✅ 做空成功: ${short.symbol}`);
                         } catch (err) {
                             log(`❌ 做空下单失败：${short.symbol}，原因: ${err.message}`);
