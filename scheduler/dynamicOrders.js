@@ -69,27 +69,32 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             let validatedStopLoss = stopLoss;
             let validatedTakeProfit = takeProfit;
 
+            // 验证价格合理性
+            if (side === 'BUY') {
+                // 多单验证
+                if (validatedStopLoss >= currentPrice) {
+                    validatedStopLoss = adjustPrecision(symbol, currentPrice * 0.995);
+                    log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                }
+                if (validatedTakeProfit <= currentPrice) {
+                    validatedTakeProfit = adjustPrecision(symbol, currentPrice * 1.005);
+                    log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                }
+            } else {
+                // 空单验证
+                if (validatedStopLoss <= currentPrice) {
+                    validatedStopLoss = adjustPrecision(symbol, currentPrice * 1.005);
+                    log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
+                }
+                if (validatedTakeProfit >= currentPrice) {
+                    validatedTakeProfit = adjustPrecision(symbol, currentPrice * 0.995);
+                    log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
+                }
+            }
+
             // 2. 设置止损单
             if (config.riskControl.enableStopLoss) {
                 currentOrderType = '止损单';
-
-                // 验证止损价是否合理
-                if (side === 'BUY') {
-                    // 多单止损应低于当前价
-                    if (stopLoss >= currentPrice) {
-                        // validatedStopLoss = currentPrice * 0.995; // 调整为低于当前价0.5%
-                        validatedStopLoss = adjustPrecision(symbol, currentPrice * 0.995),
-                            log(`⚠️ ${symbol} 多单止损价${stopLoss}高于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
-                    }
-                } else {
-                    // 空单止损应高于当前价
-                    if (stopLoss <= currentPrice) {
-                        // validatedStopLoss = currentPrice * 1.005; // 调整为高于当前价0.5%
-                        validatedStopLoss = adjustPrecision(symbol, currentPrice * 1.005),
-                            log(`⚠️ ${symbol} 空单止损价${stopLoss}低于当前价${currentPrice}，自动调整为${validatedStopLoss}`);
-                    }
-                }
-
                 currentOrderParams = {
                     symbol,
                     side: side === 'BUY' ? 'SELL' : 'BUY',
@@ -112,22 +117,6 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
             // 3. 设置止盈单
             if (config.riskControl.enableTakeProfit && isInTradingTimeRange(config.takeProfitTimeRanges)) {
                 currentOrderType = '止盈单';
-
-                // 验证止盈价是否合理
-                if (side === 'BUY') {
-                    // 多单止盈应高于当前价
-                    if (takeProfit <= currentPrice) {
-                        validatedTakeProfit = adjustPrecision(symbol, currentPrice * 1.005),
-                            log(`⚠️ ${symbol} 多单止盈价${takeProfit}低于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
-                    }
-                } else {
-                    // 空单止盈应低于当前价
-                    if (takeProfit >= currentPrice) {
-                        validatedTakeProfit = adjustPrecision(symbol, currentPrice * 0.995),
-                            log(`⚠️ ${symbol} 空单止盈价${takeProfit}高于当前价${currentPrice}，自动调整为${validatedTakeProfit}`);
-                    }
-                }
-
                 currentOrderParams = {
                     symbol,
                     side: side === 'BUY' ? 'SELL' : 'BUY',
@@ -147,12 +136,11 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
                 currentOrderParams = null;
             }
 
-            // 发送通知（使用验证后的价格）
-            const priceInfo = `入场价: ${entryPrice} | 止损: ${validatedStopLoss || stopLoss} | 止盈: ${validatedTakeProfit || takeProfit}`;
-            const profitRatio = ((validatedTakeProfit || takeProfit) - entryPrice) /
-                (entryPrice - (validatedStopLoss || stopLoss)).toFixed(2);
+            // 发送通知
+            const priceInfo = `入场价: ${entryPrice} | 止损: ${validatedStopLoss} | 止盈: ${validatedTakeProfit}`;
+            const profitRatio = calculateProfitRatio(parseFloat(entryPrice), validatedTakeProfit, validatedStopLoss);
             sendTelegramMessage(
-                `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}:1`
+                `📊 ${symbol} 动态订单设置\n${priceInfo}\n盈亏比: ${profitRatio}`
             );
         } catch (error) {
             let errorMsg = error.message;
@@ -184,126 +172,136 @@ async function setupDynamicOrdersForAllPositions(positions = []) {
  * @returns {Promise<{takeProfit: number, stopLoss: number}>}
  */
 async function calculateDynamicPrices(symbol, side, entryPrice) {
-    // 获取必要数据
-    const [klines, atr, supportResistance] = await Promise.all([
-        (async () => {
-            const data = await fetchKLines(symbol, '15m', 51);
-            return data.slice(0, -1);
-        })(),
-        calculateATR(symbol, 14),
-        calculateSupportResistance(symbol)
-    ]);
+    try {
+        // 获取必要数据
+        const [klines, atr, supportResistance, currentPrice] = await Promise.all([
+            (async () => {
+                const data = await fetchKLines(symbol, '15m', 51);
+                return data.slice(0, -1);
+            })(),
+            calculateATR(symbol, 14),
+            calculateSupportResistance(symbol),
+            getCurrentPrice(symbol)
+        ]);
 
-    // 获取当前价格
-    const currentPrice = await getCurrentPrice(symbol);
+        // 常量定义
+        const MIN_PROFIT_RATIO = 0.01; // 最小盈利比例1%
+        const MIN_RISK_REWARD = 1.5; // 最小盈亏比1.5:1
+        const SUPPORT_RESISTANCE_BUFFER = 0.005; // 支撑阻力位缓冲0.5%
+        const ATR_MULTIPLIER_TP = 2.0; // 止盈ATR倍数
+        const ATR_MULTIPLIER_SL = 1.2; // 止损ATR倍数
 
-    // 常量定义
-    const TREND_ADJUSTMENT_FACTOR = 0.6;
-    const MIN_PROFIT_RATIO = 0.005;
-    const SUPPORT_RESISTANCE_BUFFER = 0.01;
-    const DYNAMIC_TP_RATIO = 2.0; // 止盈倍数
-    const DYNAMIC_SL_RATIO = 1.0; // 止损倍数
+        const lastClose = parseFloat(klines[klines.length - 1].close);
+        
+        if (side === 'BUY') {
+            // ============= 做多场景 =============
+            let takeProfit = entryPrice + atr * ATR_MULTIPLIER_TP;
+            let stopLoss = entryPrice - atr * ATR_MULTIPLIER_SL;
 
-    // 基础波动范围
-    const dynamicRange = atr * 1.5;
-    const lastClose = parseFloat(klines[klines.length - 1].close);
-
-    // 判断趋势（使用更准确的方法）
-    const ema20 = EMA.calculate({ period: 20, values: klines.map(k => parseFloat(k.close)) });
-    const isUptrend = lastClose > ema20[ema20.length - 1];
-
-    // 趋势强度计算
-    const trendStrength = calculateTrendStrength(klines);
-
-    if (side === 'BUY') {
-        // ============= 做多场景 =============
-        const dynamicCoefficient = isUptrend
-            ? DYNAMIC_TP_RATIO
-            : DYNAMIC_TP_RATIO * (TREND_ADJUSTMENT_FACTOR + (1 - TREND_ADJUSTMENT_FACTOR) * trendStrength);
-
-        // 基础止盈计算 - 确保止盈高于当前价格
-        let dynamicTakeProfit = Math.max(
-            entryPrice + dynamicRange * dynamicCoefficient,
-            currentPrice * 1.01 // 至少比当前价高1%
-        );
-
-        // 阻力位约束
-        if (supportResistance.resistance) {
-            const resistanceWithBuffer = supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER);
-            // 只有当阻力位明显高于当前价格时才应用约束
-            if (resistanceWithBuffer > currentPrice * 1.005) {
-                dynamicTakeProfit = Math.min(dynamicTakeProfit, resistanceWithBuffer);
+            // 应用支撑阻力约束
+            if (supportResistance.resistance) {
+                const resistanceLevel = supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER);
+                takeProfit = Math.min(takeProfit, resistanceLevel);
             }
-        }
-
-        // 确保止盈价格合理
-        const minProfitPrice = Math.max(
-            entryPrice * (1 + MIN_PROFIT_RATIO),
-            currentPrice * 1.005 // 至少比当前价高0.5%
-        );
-        dynamicTakeProfit = Math.max(dynamicTakeProfit, minProfitPrice);
-
-        // 止损计算
-        let dynamicStopLoss = entryPrice - dynamicRange * DYNAMIC_SL_RATIO;
-
-        // 支撑位约束
-        if (supportResistance.support) {
-            const supportWithBuffer = supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER);
-            dynamicStopLoss = Math.max(dynamicStopLoss, supportWithBuffer);
-        }
-
-        // 确保止损低于当前价格
-        dynamicStopLoss = Math.min(dynamicStopLoss, currentPrice * 0.995);
-
-        return {
-            takeProfit: adjustPrecision(symbol, dynamicTakeProfit),
-            stopLoss: adjustPrecision(symbol, dynamicStopLoss)
-        };
-    } else {
-        // ============= 做空场景 =============
-        const dynamicCoefficient = isUptrend
-            ? DYNAMIC_TP_RATIO * 0.8 // 上涨趋势中做空更保守
-            : DYNAMIC_TP_RATIO;
-
-        // 基础止盈计算 - 确保止盈低于当前价格
-        let dynamicTakeProfit = Math.min(
-            entryPrice - dynamicRange * dynamicCoefficient,
-            currentPrice * 0.99 // 至少比当前价低1%
-        );
-
-        // 支撑位约束
-        if (supportResistance.support) {
-            const supportWithBuffer = supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER);
-            // 只有当支撑位明显低于当前价格时才应用约束
-            if (supportWithBuffer < currentPrice * 0.995) {
-                dynamicTakeProfit = Math.max(dynamicTakeProfit, supportWithBuffer);
+            if (supportResistance.support) {
+                const supportLevel = supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER);
+                stopLoss = Math.max(stopLoss, supportLevel);
             }
+
+            // 确保价格合理性
+            takeProfit = Math.max(takeProfit, currentPrice * 1.01, entryPrice * (1 + MIN_PROFIT_RATIO));
+            stopLoss = Math.min(stopLoss, currentPrice * 0.99, entryPrice * (1 - MIN_PROFIT_RATIO));
+
+            // 检查盈亏比
+            const profit = takeProfit - entryPrice;
+            const loss = entryPrice - stopLoss;
+            if (profit / loss < MIN_RISK_REWARD) {
+                takeProfit = entryPrice + loss * MIN_RISK_REWARD;
+            }
+
+            // 最终验证
+            if (takeProfit <= entryPrice) takeProfit = entryPrice * 1.02;
+            if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+
+            return {
+                takeProfit: adjustPrecision(symbol, takeProfit),
+                stopLoss: adjustPrecision(symbol, stopLoss)
+            };
+
+        } else {
+            // ============= 做空场景 =============
+            let takeProfit = entryPrice - atr * ATR_MULTIPLIER_TP;
+            let stopLoss = entryPrice + atr * ATR_MULTIPLIER_SL;
+
+            // 应用支撑阻力约束
+            if (supportResistance.support) {
+                const supportLevel = supportResistance.support * (1 + SUPPORT_RESISTANCE_BUFFER);
+                takeProfit = Math.max(takeProfit, supportLevel);
+            }
+            if (supportResistance.resistance) {
+                const resistanceLevel = supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER);
+                stopLoss = Math.min(stopLoss, resistanceLevel);
+            }
+
+            // 确保价格合理性
+            takeProfit = Math.min(takeProfit, currentPrice * 0.99, entryPrice * (1 - MIN_PROFIT_RATIO));
+            stopLoss = Math.max(stopLoss, currentPrice * 1.01, entryPrice * (1 + MIN_PROFIT_RATIO));
+
+            // 检查盈亏比
+            const profit = entryPrice - takeProfit;
+            const loss = stopLoss - entryPrice;
+            if (profit / loss < MIN_RISK_REWARD) {
+                takeProfit = entryPrice - loss * MIN_RISK_REWARD;
+            }
+
+            // 最终验证
+            if (takeProfit >= entryPrice) takeProfit = entryPrice * 0.98;
+            if (stopLoss <= entryPrice) stopLoss = entryPrice * 1.02;
+
+            return {
+                takeProfit: adjustPrecision(symbol, takeProfit),
+                stopLoss: adjustPrecision(symbol, stopLoss)
+            };
         }
 
-        // 确保止盈价格合理
-        const minProfitPrice = Math.min(
-            entryPrice * (1 - MIN_PROFIT_RATIO),
-            currentPrice * 0.995 // 至少比当前价低0.5%
-        );
-        dynamicTakeProfit = Math.min(dynamicTakeProfit, minProfitPrice);
-
-        // 止损计算
-        let dynamicStopLoss = entryPrice + dynamicRange * DYNAMIC_SL_RATIO;
-
-        // 阻力位约束
-        if (supportResistance.resistance) {
-            const resistanceWithBuffer = supportResistance.resistance * (1 - SUPPORT_RESISTANCE_BUFFER);
-            dynamicStopLoss = Math.min(dynamicStopLoss, resistanceWithBuffer);
+    } catch (error) {
+        log(`❌ ${symbol} 动态价格计算失败: ${error.message}`);
+        
+        // 失败时使用保守的默认值
+        const defaultProfitRatio = 0.02;
+        const defaultLossRatio = 0.01;
+        
+        if (side === 'BUY') {
+            return {
+                takeProfit: adjustPrecision(symbol, entryPrice * (1 + defaultProfitRatio)),
+                stopLoss: adjustPrecision(symbol, entryPrice * (1 - defaultLossRatio))
+            };
+        } else {
+            return {
+                takeProfit: adjustPrecision(symbol, entryPrice * (1 - defaultProfitRatio)),
+                stopLoss: adjustPrecision(symbol, entryPrice * (1 + defaultLossRatio))
+            };
         }
-
-        // 确保止损高于当前价格
-        dynamicStopLoss = Math.max(dynamicStopLoss, currentPrice * 1.005);
-
-        return {
-            takeProfit: adjustPrecision(symbol, dynamicTakeProfit),
-            stopLoss: adjustPrecision(symbol, dynamicStopLoss)
-        };
     }
+}
+
+/**
+ * 计算盈亏比（防止除零错误）
+ */
+function calculateProfitRatio(entryPrice, takeProfit, stopLoss) {
+    if (entryPrice === stopLoss) {
+        return 'N/A';
+    }
+    
+    const profit = Math.abs(takeProfit - entryPrice);
+    const loss = Math.abs(entryPrice - stopLoss);
+    
+    if (loss === 0) {
+        return 'Infinity:1';
+    }
+    
+    const ratio = (profit / loss).toFixed(2);
+    return `${ratio}:1`;
 }
 
 /**
