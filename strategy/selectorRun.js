@@ -35,8 +35,49 @@ async function fetchKlines(symbol, interval, limit = 50) {
 
 // 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '15m') {
-  const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
-  const lastKline = klines[klines.length - 1]; // 获取最后一根K线
+  try {
+    const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
+    const lastKline = klines[klines.length - 1]; // 获取最后一根K线
+
+    // ============ 新增：十字星判断 ============
+    const isDoji = (kline) => {
+      const bodySize = Math.abs(kline.close - kline.open);
+      const totalRange = kline.high - kline.low;
+      
+      if (totalRange === 0) return false; // 避免除零错误
+      
+      // 十字星特征：实体很小，影线相对较长
+      const isSmallBody = bodySize / totalRange < 0.2; // 实体小于总范围的20%
+      const hasLongShadows = bodySize > 0 ? (totalRange - bodySize) / bodySize > 2 : totalRange > 0;
+      
+      return isSmallBody && hasLongShadows;
+    };
+
+    const isBullishDoji = (kline) => {
+      if (!isDoji(kline)) return false;
+      // 看涨十字星：下影线明显长于上影线
+      const lowerShadow = Math.min(kline.open, kline.close) - kline.low;
+      const upperShadow = kline.high - Math.max(kline.open, kline.close);
+      return lowerShadow > upperShadow * 1.5 && lowerShadow > 0;
+    };
+
+    const isBearishDoji = (kline) => {
+      if (!isDoji(kline)) return false;
+      // 看跌十字星：上影线明显长于下影线
+      const upperShadow = kline.high - Math.max(kline.open, kline.close);
+      const lowerShadow = Math.min(kline.open, kline.close) - kline.low;
+      return upperShadow > lowerShadow * 1.5 && upperShadow > 0;
+    };
+
+    // 检查最近3根K线中的十字星形态
+    const recentKlines = klines.slice(-3);
+    const hasBullishDoji = recentKlines.some(isBullishDoji);
+    const hasBearishDoji = recentKlines.some(isBearishDoji);
+    
+    // 获取最后一根K线是否为十字星
+    const lastKlineIsDoji = isDoji(lastKline);
+    const lastKlineIsBullishDoji = isBullishDoji(lastKline);
+    const lastKlineIsBearishDoji = isBearishDoji(lastKline);
 
   // ============ 计算震荡幅度 ==========
   const recent10Klines = klines.slice(-10);
@@ -186,6 +227,23 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   if (lastEma5 < lastEma13) shortScore += 0.5;
   if (lastClose < lastBoll.middle) shortScore += 0.5;
 
+    // 十字星信号增强
+    if (hasBullishDoji && lastClose < lastBoll.lower) {
+      longScore += 1.5;
+    }
+    
+    if (hasBearishDoji && lastClose > lastBoll.upper) {
+      shortScore += 1.5;
+    }
+    
+    if (lastKlineIsBullishDoji && volumeTrendUp) {
+      longScore += 1;
+    }
+    
+    if (lastKlineIsBearishDoji && volumeTrendDown) {
+      shortScore += 1;
+    }
+
   // 结合波动率和时间周期
   const baseFactor = 1.5; // 基础倍数
   const volatilityAdjustment = (lastATR / lastClose) * 100; // ATR占比百分比
@@ -198,16 +256,24 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
   if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
 
-  // ========== 最终信号选择 ==========
-  // const threshold = 3;
+  // ========== 最终信号选择（考虑十字星确认） ==========
   const threshold = config.interval === '15m' ? 2.5 : 3;
   let signal = null;
   let score = 0;
-  // log(`✅ ${symbol}: (得分: longScore-${longScore} shortScore-${shortScore})`);
+
+  // 十字星提供额外的确认信号
   if (longScore >= threshold && longScore >= shortScore) {
+    // 如果有看跌十字星出现在多头信号中，需要谨慎
+    if (hasBearishDoji && longScore < threshold + 1) {
+      return null;
+    }
     signal = 'LONG';
     score = longScore;
   } else if (shortScore >= threshold) {
+    // 如果有看涨十字星出现在空头信号中，需要谨慎
+    if (hasBullishDoji && shortScore < threshold + 1) {
+      return null;
+    }
     signal = 'SHORT';
     score = shortScore;
   }
@@ -229,9 +295,20 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
       avgVolume,
       volumeEMA: lastVolumeEMAValue,
       volumeStdDev,
-      volumeTrend: volumeTrendUp ? 'up' : volumeTrendDown ? 'down' : 'neutral'
+      volumeTrend: volumeTrendUp ? 'up' : volumeTrendDown ? 'down' : 'neutral',
+      // 新增十字星信息
+      dojiPattern: {
+        hasDoji: hasBullishDoji || hasBearishDoji,
+        bullishDoji: hasBullishDoji,
+        bearishDoji: hasBearishDoji,
+        lastKlineIsDoji
+      }
     }
   };
+  } catch (error) {
+    log(`❌ ${symbol} 评估过程中出错: ${error.message}`);
+    return null;
+  }
 }
 
 // ========== 辅助函数 ==========
