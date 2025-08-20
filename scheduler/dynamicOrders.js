@@ -8,7 +8,6 @@ const { log } = require('../utils/logger');
 const { sendTelegramMessage } = require('../telegram/messenger');
 const moment = require('moment-timezone');
 const { createTakeProfitOrder, createStopLossOrder, } = require('../binance/trade')
-const { calculateTrendStrength, simpleMA } = require('../utils/utils')
 const { getCurrentPrice } = require('../binance/market')
 const { EMA, BollingerBands } = require('technicalindicators');
 

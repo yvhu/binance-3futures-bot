@@ -1,4 +1,4 @@
-const { db, trade } = require('../db');
+// const { db, trade } = require('../db');
 /**
  * CREATE TABLE IF NOT EXISTS hourly_stats (
                 -- 自增主键ID
@@ -81,21 +81,21 @@ const { db, trade } = require('../db');
 );
  */
 // 记录新交易
-const tradeId = trade.recordTrade(db, {
-    symbol: 'BTCUSDT',
-    price: 50000,
-    qtyRaw: 0.002,
-    side: 'BUY'
-});
+// const tradeId = trade.recordTrade(db, {
+//     symbol: 'BTCUSDT',
+//     price: 50000,
+//     qtyRaw: 0.002,
+//     side: 'BUY'
+// });
 
 // 平仓交易
-const success = trade.closeTrade(db, tradeId, 52000);
+// const success = trade.closeTrade(db, tradeId, 52000);
 
 // 获取未平仓交易
-const openTrades = trade.getOpenTrades(db);
+// const openTrades = trade.getOpenTrades(db);
 
 // 获取某个交易对的记录
-const btcTrades = trade.getTradesBySymbol(db, 'BTCUSDT');
+// const btcTrades = trade.getTradesBySymbol(db, 'BTCUSDT');
 
 // 获取总盈利
-const totalProfit = trade.getTotalProfit(db);
+// const totalProfit = trade.getTotalProfit(db);

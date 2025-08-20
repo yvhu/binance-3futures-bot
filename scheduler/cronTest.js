@@ -7,7 +7,7 @@ const { getCachedTopSymbols } = require('../utils/cache');
 const { sendTelegramMessage } = require('../telegram/messenger'); // Telegram发送消息
 const { cacheTopSymbols } = require('../utils/cache');
 const config = require('../config/config');
-const { db, trade } = require('../db');
+// const { db, trade } = require('../db');
 const { setupDynamicOrdersForAllPositions } = require('./dynamicOrders');
 
 async function startSchedulerTest() {

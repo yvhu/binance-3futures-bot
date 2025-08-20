@@ -12,20 +12,20 @@ db.pragma('journal_mode = WAL'); // 更好的性能
 
 // 引入子模块初始化函数
 const log = require('./log');
-const trade = require('./trade');
-const hourlyStats = require('./hourlyStats');
+// const trade = require('./trade');
+// const hourlyStats = require('./hourlyStats');
 
 // 初始化所有表
 function initTables() {
   log.init(db);
-  trade.init(db);
-  hourlyStats.init(db);
+  // trade.init(db);
+  // hourlyStats.init(db);
 }
 
 module.exports = {
   db,
   initTables,
   log,
-  trade,
-  hourlyStats,
+  // trade,
+  // hourlyStats,
 };
