@@ -33,68 +33,22 @@ async function fetchKlines(symbol, interval, limit = 50) {
   }));
 }
 
-// 评估一个币种的做多或做空信号，并给出强度评分
 async function evaluateSymbolWithScore(symbol, interval = '15m') {
-  try {
-    const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
-    const lastKline = klines[klines.length - 1]; // 获取最后一根K线
-
-    // ============ 新增：十字星判断 ============
-    const isDoji = (kline) => {
-      const bodySize = Math.abs(kline.close - kline.open);
-      const totalRange = kline.high - kline.low;
-      
-      if (totalRange === 0) return false; // 避免除零错误
-      
-      // 十字星特征：实体很小，影线相对较长
-      const isSmallBody = bodySize / totalRange < 0.2; // 实体小于总范围的20%
-      const hasLongShadows = bodySize > 0 ? (totalRange - bodySize) / bodySize > 2 : totalRange > 0;
-      
-      return isSmallBody && hasLongShadows;
-    };
-
-    const isBullishDoji = (kline) => {
-      if (!isDoji(kline)) return false;
-      // 看涨十字星：下影线明显长于上影线
-      const lowerShadow = Math.min(kline.open, kline.close) - kline.low;
-      const upperShadow = kline.high - Math.max(kline.open, kline.close);
-      return lowerShadow > upperShadow * 1.5 && lowerShadow > 0;
-    };
-
-    const isBearishDoji = (kline) => {
-      if (!isDoji(kline)) return false;
-      // 看跌十字星：上影线明显长于下影线
-      const upperShadow = kline.high - Math.max(kline.open, kline.close);
-      const lowerShadow = Math.min(kline.open, kline.close) - kline.low;
-      return upperShadow > lowerShadow * 1.5 && upperShadow > 0;
-    };
-
-    // 检查最近3根K线中的十字星形态
-    const recentKlines = klines.slice(-3);
-    const hasBullishDoji = recentKlines.some(isBullishDoji);
-    const hasBearishDoji = recentKlines.some(isBearishDoji);
-    
-    // 获取最后一根K线是否为十字星
-    const lastKlineIsDoji = isDoji(lastKline);
-    const lastKlineIsBullishDoji = isBullishDoji(lastKline);
-    const lastKlineIsBearishDoji = isBearishDoji(lastKline);
+  const klines = (await fetchKlines(symbol, interval, 101)).slice(0, -1);
+  const lastKline = klines[klines.length - 1];
 
   // ============ 计算震荡幅度 ==========
   const recent10Klines = klines.slice(-10);
   const oscillations = recent10Klines.map(kline => {
-    // 计算单根K线的震荡幅度(百分比形式)
-    // 公式:(最高价 - 最低价)/开盘价 * 100
     return (kline.high - kline.low) / kline.open * 100;
   });
-  // 统计震荡幅度大于0.6%的K线数量
   const avgOscillation = oscillations.reduce((a, b) => a + b, 0) / oscillations.length;
-  // 直接要求平均振幅>0.6%
   const isConditionMet = avgOscillation > 0.6;
   if (!isConditionMet) {
-    // log(`❌ ${symbol} 震荡幅度太小即过滤`);
     return null;
   }
   if (!klines || klines.length < 50) return null;
+
   // 提取价格和成交量数据
   const close = klines.map(k => Number(k.close)).filter(v => !isNaN(v));
   const high = klines.map(k => Number(k.high)).filter(v => !isNaN(v));
@@ -102,7 +56,7 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   const volume = klines.map(k => Number(k.volume)).filter(v => !isNaN(v));
 
   // ========== 计算平均成交量 ==========
-  const volumePeriod = 50; // 使用更长周期计算平均成交量
+  const volumePeriod = 50;
   const avgVolume = volume.slice(-volumePeriod).reduce((a, b) => a + b, 0) / volumePeriod;
 
   // 计算成交量EMA和标准差
@@ -113,9 +67,10 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
     volume.slice(-volumePeriod).reduce((sum, vol) => sum + Math.pow(vol - avgVolume, 2), 0) / volumePeriod
   );
 
-  const ema5 = config.interval == '15m' ? EMA.calculate({ period: 5, values: close }) : EMA.calculate({ period: 5, values: close });   // 原5 → 3
-  const ema13 = config.interval == '15m' ? EMA.calculate({ period: 10, values: close }) : EMA.calculate({ period: 13, values: close });  // 原13 → 8
-  const boll = config.interval == '15m' ? BollingerBands.calculate({ period: 14, values: close, stdDev: 2 }) : BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
+  // ========== 修复：统一使用相同的EMA和布林带参数 ==========
+  const ema5 = EMA.calculate({ period: 5, values: close });
+  const ema13 = EMA.calculate({ period: 13, values: close });
+  const boll = BollingerBands.calculate({ period: 20, values: close, stdDev: 2 });
 
   const vwap = getVWAP(close, high, low, volume);
   const atr = calculateATR(klines, 14);
@@ -123,7 +78,6 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // 对齐所有指标长度
   const minLength = Math.min(ema5.length, ema13.length, boll.length, vwap.length, atr.length, volumeEMA.length);
   if (minLength < 2) {
-    log(`❌ ${symbol} 指标长度不足`);
     return null;
   }
 
@@ -137,14 +91,12 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   const alignedVolume = volume.slice(offset);
   const alignedVolumeEMA = volumeEMA.slice(-minLength);
 
-  // 获取最新值 minLength - 1（index=长度-1取最后一个数据）
+  // 获取最新值
   const lastClose = alignedClose[minLength - 1];
-  const prevClose = alignedClose[minLength - 1];
   const lastEma5 = alignedEma5[minLength - 1];
   const lastEma13 = alignedEma13[minLength - 1];
   const lastVWAP = alignedVWAP[minLength - 1];
   const lastBoll = alignedBoll[minLength - 1];
-
   const lastATR = alignedATR[minLength - 1];
   const lastVolume = alignedVolume[minLength - 1];
   const lastVolumeEMAValue = alignedVolumeEMA[minLength - 1];
@@ -159,24 +111,15 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
     for (let i = 1; i <= period; i++) {
       changes.push(values[values.length - i] > values[values.length - i - 1]);
     }
-    // 改为60%或使用加权确认
     return changes.filter(x => x).length >= Math.floor(period * 0.6);
   };
 
-  // ========== 改进的成交量判断 ==========
+  // ========== 成交量判断 ==========
   const volumeRatio = lastVolume / avgVolume;
   const volumeEMARatio = lastVolume / lastVolumeEMAValue;
-  /**
-   * volumeRatio > 1.5（成交量比前一根增长50%）
-   * volumeEMARatio > 1.5（成交量比EMA均线增长50%）
-   * lastVolume > avgVolume + 1.5 * volumeStdDev（成交量超过均值+1.5倍标准差）
-   */
-  const isVolumeSpike = config.interval == '15m' ? ((volumeRatio > 1.4 || volumeEMARatio > 1.4) || lastVolume > avgVolume + 1.2 * volumeStdDev) : ((volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev)
-
-  // (volumeRatio > 1.3 || volumeEMARatio > 1.3) || lastVolume > avgVolume + 1.0 * volumeStdDev; 
-  const isVolumeDecline =
-    (volumeRatio < 0.9 || volumeEMARatio < 0.9) ||  // 从 0.85 → 0.9（10% 萎缩）
-    lastVolume < avgVolume - 1.0 * volumeStdDev;    // 从 1.5 → 1.0（更敏感）
+  
+  const isVolumeSpike = (volumeRatio > 1.4 || volumeEMARatio > 1.4) || lastVolume > avgVolume + 1.2 * volumeStdDev;
+  const isVolumeDecline = (volumeRatio < 0.9 || volumeEMARatio < 0.9) || lastVolume < avgVolume - 1.0 * volumeStdDev;
 
   // 成交量趋势判断
   const volumeTrendUp = trendConfirmation(alignedVolume, 3);
@@ -185,95 +128,54 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
   // ========== 横盘震荡过滤 ==========
   const flat = isFlatMarket({ close, high, low }, 0.005, baseRatio);
   if (flat) {
-    // log(`🚫 ${symbol} 横盘震荡过滤`);
     return null;
   }
 
-  const uptrendConfirmed = config.interval == '15m' ? trendConfirmation(alignedClose, 3) : trendConfirmation(alignedClose, 5);
+  const uptrendConfirmed = trendConfirmation(alignedClose, 5);
   const downtrendConfirmed = trendConfirmation(alignedClose.map(x => -x), 5);
 
   // ========== 波动性和成交量过滤 ==========
-  // 0.2% ATR 对于 3m 是合理的（例如 BTC 每3分钟 20刀）。
-  // 但对于 15m，可能变成 80～100刀的变动，0.2% 反而误杀强势币。
-  if (config.interval == '15m' ? (atrPercent < 0.003) : (atrPercent < 0.002)) return null;
-
-  // if (isVolumeDecline) {
-  //   log(`🚫 ${symbol} 成交量不足(当前=${lastVolume}, 平均=${avgVolume.toFixed(2)}, EMA=${lastVolumeEMAValue.toFixed(2)}, 标准差=${volumeStdDev.toFixed(2)})`);
-  //   return null;
-  // }
+  if (atrPercent < 0.003) return null;
 
   const enableTakeProfitByTime = isInTradingTimeRange(config.takeSelectRunTimeRanges);
-
   if (!enableTakeProfitByTime) {
-    // const serverTime = new Date();
-    // const formattedTime = moment(serverTime)
-    //   .tz(timezone)
-    //   .format('YYYY年MM月DD日 HH:mm');
-    // sendTelegramMessage(`✅ 当前时段流动性不足不开仓 ${new Date()}, 时间段：${formattedTime}`);
-    // log(`🚫 ${symbol} 当前时段流动性不足`);
     return null;
   }
 
-  // ========== 改进后的打分逻辑 ==========
+  // ========== 修复：重新设计打分逻辑 ==========
   let longScore = 0;
   let shortScore = 0;
 
-  // 基础条件
-  if (lastClose > lastVWAP) longScore += 0.5;
-  if (lastEma5 > lastEma13) longScore += 0.5;
-  if (lastClose > lastBoll.middle) longScore += 0.5;
+  // 基础条件（修复可能的逻辑错误）
+  if (lastClose > lastVWAP) longScore += 1;
+  if (lastEma5 > lastEma13) longScore += 1;
+  if (lastClose > lastBoll.middle) longScore += 1;
 
-  if (lastClose < lastVWAP) shortScore += 0.5;
-  if (lastEma5 < lastEma13) shortScore += 0.5;
-  if (lastClose < lastBoll.middle) shortScore += 0.5;
+  if (lastClose < lastVWAP) shortScore += 1;
+  if (lastEma5 < lastEma13) shortScore += 1;
+  if (lastClose < lastBoll.middle) shortScore += 1;
 
-    // 十字星信号增强
-    if (hasBullishDoji && lastClose < lastBoll.lower) {
-      longScore += 1.5;
-    }
-    
-    if (hasBearishDoji && lastClose > lastBoll.upper) {
-      shortScore += 1.5;
-    }
-    
-    if (lastKlineIsBullishDoji && volumeTrendUp) {
-      longScore += 1;
-    }
-    
-    if (lastKlineIsBearishDoji && volumeTrendDown) {
-      shortScore += 1;
-    }
+  // 强势条件（确保方向正确）
+  if (lastClose > lastBoll.upper && isVolumeSpike && volumeTrendUp && uptrendConfirmed) longScore += 2;
+  if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown && downtrendConfirmed) shortScore += 2;
 
-  // 结合波动率和时间周期
-  const baseFactor = 1.5; // 基础倍数
-  const volatilityAdjustment = (lastATR / lastClose) * 100; // ATR占比百分比
-  const dynamicFactor = baseFactor + volatilityAdjustment / 50; // 每1%波动率增加0.02倍
+  // EMA金叉死叉确认（修复：确保是最近发生的）
+  const prevEma5 = alignedEma5[minLength - 2];
+  const prevEma13 = alignedEma13[minLength - 2];
+  
+  if (lastEma5 > lastEma13 && prevEma5 <= prevEma13) longScore += 2; // 金叉
+  if (lastEma5 < lastEma13 && prevEma5 >= prevEma13) shortScore += 2; // 死叉
 
-  const atrBasedThreshold = lastATR * Math.min(dynamicFactor, 2.5); // 不超过2.5倍
-  // 强势条件(权重更高)
-  if (lastClose > lastBoll.upper && isVolumeSpike && volumeTrendUp) longScore += 2;
-  if (lastClose < lastBoll.lower && isVolumeSpike && volumeTrendDown) shortScore += 2;
-  if (lastEma5 - lastEma13 > atrBasedThreshold && uptrendConfirmed && volumeTrendUp) longScore += 1;
-  if (lastEma13 - lastEma5 > atrBasedThreshold && downtrendConfirmed && volumeTrendDown) shortScore += 1;
-
-  // ========== 最终信号选择（考虑十字星确认） ==========
-  const threshold = config.interval === '15m' ? 2.5 : 3;
+  // ========== 最终信号选择 ==========
+  const threshold = 4; // 提高阈值
   let signal = null;
   let score = 0;
 
-  // 十字星提供额外的确认信号
-  if (longScore >= threshold && longScore >= shortScore) {
-    // 如果有看跌十字星出现在多头信号中，需要谨慎
-    if (hasBearishDoji && longScore < threshold + 1) {
-      return null;
-    }
+  // 修复：确保信号有足够的优势
+  if (longScore >= threshold && longScore > shortScore + 1) {
     signal = 'LONG';
     score = longScore;
-  } else if (shortScore >= threshold) {
-    // 如果有看涨十字星出现在空头信号中，需要谨慎
-    if (hasBullishDoji && shortScore < threshold + 1) {
-      return null;
-    }
+  } else if (shortScore >= threshold && shortScore > longScore + 1) {
     signal = 'SHORT';
     score = shortScore;
   }
@@ -295,20 +197,38 @@ async function evaluateSymbolWithScore(symbol, interval = '15m') {
       avgVolume,
       volumeEMA: lastVolumeEMAValue,
       volumeStdDev,
-      volumeTrend: volumeTrendUp ? 'up' : volumeTrendDown ? 'down' : 'neutral',
-      // 新增十字星信息
-      dojiPattern: {
-        hasDoji: hasBullishDoji || hasBearishDoji,
-        bullishDoji: hasBullishDoji,
-        bearishDoji: hasBearishDoji,
-        lastKlineIsDoji
-      }
+      volumeTrend: volumeTrendUp ? 'up' : volumeTrendDown ? 'down' : 'neutral'
     }
   };
-  } catch (error) {
-    log(`❌ ${symbol} 评估过程中出错: ${error.message}`);
-    return null;
+}
+
+// 修改测试函数，添加调试
+async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
+  const longList = [];
+  const shortList = [];
+
+  for (const symbol of symbolList) {
+    try {
+      const res = await evaluateSymbolWithScore(symbol, interval);
+      if (!res) continue;
+      
+      // 添加调试信息
+      console.log(`${symbol} - ${res.side} - 得分: ${res.score} - 价格: ${res.price}`);
+      console.log(`  EMA5: ${res.indicators.ema5}, EMA13: ${res.indicators.ema13}`);
+      console.log(`  VWAP: ${res.indicators.vwap}, 布林中轨: ${res.indicators.bollinger.middle}`);
+      
+      if (res.side === 'LONG') longList.push(res);
+      if (res.side === 'SHORT') shortList.push(res);
+
+    } catch (err) {
+      console.log(`❌ ${symbol} 评估失败: ${err.message}`);
+    }
   }
+  
+  const topLong = longList.sort((a, b) => b.score - a.score).slice(0, topN);
+  const topShort = shortList.sort((a, b) => b.score - a.score).slice(0, topN);
+  
+  return { topLong, topShort };
 }
 
 // ========== 辅助函数 ==========
@@ -361,168 +281,35 @@ async function getTopLongShortSymbols(symbolList, topN = 3) {
 }
 
 // 遍历多个币种，返回 topN 的多头和空头
-async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
-  const longList = [];
-  const shortList = [];
+// async function getTopLongShortSymbolsTest(symbolList, topN = 3, interval) {
+//   const longList = [];
+//   const shortList = [];
 
-  for (const symbol of symbolList) {
-    try {
-      const res = await evaluateSymbolWithScore(symbol, interval);
-      if (!res) continue;
-      if (res?.side === 'LONG') longList.push(res);
-      if (res?.side === 'SHORT') shortList.push(res);
-      // 添加3分钟级别确认
-      // const confirmedBy3M = await confirmWith3Minute(res.symbol, res.side, res.price);
+//   for (const symbol of symbolList) {
+//     try {
+//       const res = await evaluateSymbolWithScore(symbol, interval);
+//       if (!res) continue;
+//       if (res?.side === 'LONG') longList.push(res);
+//       if (res?.side === 'SHORT') shortList.push(res);
+//       // 添加3分钟级别确认
+//       // const confirmedBy3M = await confirmWith3Minute(res.symbol, res.side, res.price);
 
-      // if (confirmedBy3M) {
-      //   if (res?.side === 'LONG') longList.push(res);
-      //   if (res?.side === 'SHORT') shortList.push(res);
-      //   // if (res.side === 'LONG') longList.push({ ...res, confirmedBy3M });
-      //   // if (res.side === 'SHORT') shortList.push({ ...res, confirmedBy3M });
-      // } else {
-      //   log(`⚠️ ${res.symbol} ${res.side}信号未通过3分钟确认`);
-      // }
+//       // if (confirmedBy3M) {
+//       //   if (res?.side === 'LONG') longList.push(res);
+//       //   if (res?.side === 'SHORT') shortList.push(res);
+//       //   // if (res.side === 'LONG') longList.push({ ...res, confirmedBy3M });
+//       //   // if (res.side === 'SHORT') shortList.push({ ...res, confirmedBy3M });
+//       // } else {
+//       //   log(`⚠️ ${res.symbol} ${res.side}信号未通过3分钟确认`);
+//       // }
 
-    } catch (err) {
-      log(`❌ ${symbol} 评估失败: ${err.message}`);
-    }
-  }
-  const topLong = longList.sort((a, b) => b.score - a.score);
-  const topShort = shortList.sort((a, b) => b.score - a.score);
-  return { topLong, topShort };
-}
-
-// 3分钟级别确认函数
-async function confirmWith3Minute(symbol, side, entryPrice) {
-  try {
-    // 获取3分钟K线数据
-    const klines3m = (await fetchKlines(symbol, '3m', 21)).slice(0, -1);
-    if (!klines3m || klines3m.length < 20) return false;
-
-    const close3m = klines3m.map(k => Number(k.close));
-    const high3m = klines3m.map(k => Number(k.high));
-    const low3m = klines3m.map(k => Number(k.low));
-    const volume3m = klines3m.map(k => Number(k.volume));
-
-    // 计算3分钟级别指标
-    const ema5_3m = EMA.calculate({ period: 5, values: close3m });
-    const ema10_3m = EMA.calculate({ period: 10, values: close3m });
-    const currentPrice3m = close3m[close3m.length - 1];
-
-    // 获取当前价格
-    const currentMarketPrice = await getCurrentPrice(symbol);
-
-    if (side === 'LONG') {
-      return confirmLong3M(
-        close3m, high3m, low3m, volume3m,
-        ema5_3m, ema10_3m, currentPrice3m, currentMarketPrice, entryPrice
-      );
-    } else {
-      return confirmShort3M(
-        close3m, high3m, low3m, volume3m,
-        ema5_3m, ema10_3m, currentPrice3m, currentMarketPrice, entryPrice
-      );
-    }
-
-  } catch (error) {
-    log(`❌ ${symbol} 3分钟确认失败: ${error.message}`);
-    return false;
-  }
-}
-
-// 多头3分钟确认逻辑
-function confirmLong3M(close, high, low, volume, ema5, ema10, currentPrice, marketPrice, entryPrice) {
-  const lastIndex = close.length - 1;
-
-  // 1. 价格确认：当前价格应该在EMA之上
-  if (currentPrice < ema5[lastIndex] || currentPrice < ema10[lastIndex]) {
-    return false;
-  }
-
-  // 2. 趋势确认：短期EMA在长期EMA之上
-  if (ema5[lastIndex] <= ema10[lastIndex]) {
-    return false;
-  }
-
-  // 3. 动量确认：最近3根K线至少2根收阳
-  const recentCandles = close.slice(-3);
-  const positiveCandles = recentCandles.filter((price, index, arr) => {
-    return index === 0 || price > arr[index - 1];
-  }).length;
-
-  if (positiveCandles < 2) {
-    return false;
-  }
-
-  // 4. 成交量确认：最近成交量不萎缩
-  const recentVolume = volume.slice(-3);
-  const avgVolume = recentVolume.reduce((a, b) => a + b, 0) / recentVolume.length;
-  const prevAvgVolume = volume.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
-
-  if (avgVolume < prevAvgVolume * 0.7) {
-    return false;
-  }
-
-  // 5. 价格位置确认：不要追得太高
-  const priceDeviation = (marketPrice - entryPrice) / entryPrice;
-  if (priceDeviation > 0.01) { // 如果已经涨超过1%，放弃
-    return false;
-  }
-
-  // 6. 回调确认：最好有小的回调
-  const recentHigh = Math.max(...high.slice(-5));
-  const pullback = (recentHigh - marketPrice) / recentHigh;
-  const hasHealthyPullback = pullback > 0.002 && pullback < 0.01; // 0.2%-1%的回调
-
-  return hasHealthyPullback || priceDeviation <= 0.003; // 要么有健康回调，要么涨幅很小
-}
-
-// 空头3分钟确认逻辑
-function confirmShort3M(close, high, low, volume, ema5, ema10, currentPrice, marketPrice, entryPrice) {
-  const lastIndex = close.length - 1;
-
-  // 1. 价格确认：当前价格应该在EMA之下
-  if (currentPrice > ema5[lastIndex] || currentPrice > ema10[lastIndex]) {
-    return false;
-  }
-
-  // 2. 趋势确认：短期EMA在长期EMA之下
-  if (ema5[lastIndex] >= ema10[lastIndex]) {
-    return false;
-  }
-
-  // 3. 动量确认：最近3根K线至少2根收阴
-  const recentCandles = close.slice(-3);
-  const negativeCandles = recentCandles.filter((price, index, arr) => {
-    return index === 0 || price < arr[index - 1];
-  }).length;
-
-  if (negativeCandles < 2) {
-    return false;
-  }
-
-  // 4. 成交量确认：下跌放量或反弹缩量
-  const recentVolume = volume.slice(-3);
-  const avgVolume = recentVolume.reduce((a, b) => a + b, 0) / recentVolume.length;
-  const prevAvgVolume = volume.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
-
-  // 下跌时放量最好，或者至少不缩量
-  if (avgVolume < prevAvgVolume * 0.6) {
-    return false;
-  }
-
-  // 5. 价格位置确认：不要追得太低
-  const priceDeviation = (entryPrice - marketPrice) / entryPrice;
-  if (priceDeviation > 0.01) { // 如果已经跌超过1%，放弃
-    return false;
-  }
-
-  // 6. 反弹确认：最好有小的反弹
-  const recentLow = Math.min(...low.slice(-5));
-  const bounce = (marketPrice - recentLow) / recentLow;
-  const hasHealthyBounce = bounce > 0.002 && bounce < 0.01; // 0.2%-1%的反弹
-
-  return hasHealthyBounce || priceDeviation <= 0.003; // 要么有健康反弹，要么跌幅很小
-}
+//     } catch (err) {
+//       log(`❌ ${symbol} 评估失败: ${err.message}`);
+//     }
+//   }
+//   const topLong = longList.sort((a, b) => b.score - a.score);
+//   const topShort = shortList.sort((a, b) => b.score - a.score);
+//   return { topLong, topShort };
+// }
 
 module.exports = { getTopLongShortSymbols, getTopLongShortSymbolsTest, fetchKlines };
